@@ -23,7 +23,7 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
 - Reuse `@modelcontextprotocol/sdk` transports; wrap stdio via `scripts/mcp_stdio_wrapper.sh`.
 - Mirror Python helper behavior:
   - `${VAR}`, `${VAR:-default}`, `$env:VAR` interpolation.
-  - Optional OAuth token cache directory handling.
+- Optional OAuth token cache directory handling (defaulting to `~/.mcp-runtime/<server>` when none is provided).
   - Tool signature + schema fetching for `list`.
 - Provide lazy connection pooling per server to minimize startup cost.
 
@@ -47,3 +47,4 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
 - How aggressively should we parallelize list calls? Current helper serializes to avoid load.
 - Should we bundle a minimal REPL for ad-hoc debugging, or keep CLI focused on list/call?
 - Do we expose streaming/async iterator interfaces for tools returning logs?
+- What UX do we provide for completing OAuth browser flows (automated callback server vs. copy/paste codes)?
