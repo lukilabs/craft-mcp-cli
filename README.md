@@ -56,6 +56,33 @@ const result = await callOnce({
 });
 ```
 
+## Configuration Sources
+
+`mcp-runtime` automatically merges server definitions from multiple tools so your CLI, local IDEs, and agents stay in sync. The default priority is:
+
+1. `config/mcp_servers.json` in your project
+2. Project-scoped `.mcp.json` (Claude Code)
+3. Project-scoped `.cursor/mcp.json`
+4. Project-scoped `.claude/mcp.json`
+5. Claude Desktop config (`claude_desktop_config.json`)
+6. Cursor user config (`~/.cursor/mcp.json` or OS equivalent)
+7. Codex `~/.codex/config.toml`
+
+Sources earlier in the list win conflicts. Create `config/mcp_sources.json` to customize the order or add additional files:
+
+```json
+{
+  "strategy": "last-wins",
+  "sources": [
+    { "kind": "codex" },
+    { "kind": "cursor-user" },
+    { "kind": "local-json", "path": "./config/mcp_servers.json" }
+  ]
+}
+```
+
+Supported `kind` values are `local-json`, `project-mcp-json`, `cursor-project`, `cursor-user`, `claude-project`, `claude-user`, `claude-desktop`, and `codex`. Every entry may override `path` and set `optional: false` when a file must exist. Combine this with environment-variable headers (for example `CONTEXT7_API_KEY`) to keep secrets out of source control while still allowing IDE-specific configs to extend the same runtime.
+
 ## CLI Reference
 
 ```
@@ -108,8 +135,24 @@ Prefer the `createServerProxy` helper when you want an ergonomic proxy object fo
 ```ts
 import { createRuntime, createServerProxy } from "mcp-runtime";
 
-const runtime = await createRuntime();
-const context7 = createServerProxy(runtime, "context7");
+const mcpRuntime = await createRuntime({
+	servers: [
+		{
+			name: "context7",
+			description: "Context7 docs MCP",
+			command: {
+				kind: "http",
+				url: new URL("https://mcp.context7.com/mcp"),
+				headers: process.env.CONTEXT7_API_KEY
+					? { Authorization: `Bearer ${process.env.CONTEXT7_API_KEY}` }
+					: undefined,
+			},
+		},
+	],
+});
+// Inline definitions work at runtime; move this block to config/mcp_servers.json if you prefer static config.
+
+const context7 = createServerProxy(mcpRuntime, "context7");
 
 const search = await context7.resolveLibraryId("react");
 const docs = await context7.getLibraryDocs("react"); // maps to required schema fields
@@ -117,7 +160,7 @@ const docs = await context7.getLibraryDocs("react"); // maps to required schema 
 console.log(search.text()); // "Available Libraries ..."
 console.log(docs.markdown()); // markdown excerpt
 
-await runtime.close();
+await mcpRuntime.close();
 ```
 
 Every property access maps from camelCase to the underlying tool name automatically (`resolveLibraryId` → `resolve-library-id`). Beyond method names, the proxy:
@@ -128,7 +171,7 @@ Every property access maps from camelCase to the underlying tool name automatica
 - accepts primitives, tuples, or plain objects and routes them onto required schema fields in order (multi-argument tools like Firecrawl’s `scrape` work with positional calls);
 
 ```ts
-const firecrawl = createServerProxy(runtime, "firecrawl");
+const firecrawl = createServerProxy(mcpRuntime, "firecrawl");
 await firecrawl.firecrawlScrape(
 	"https://example.com/docs",
 	["markdown", "html"], // 2nd required/optional field from schema
@@ -141,21 +184,28 @@ You can still drop down to `context7.call("resolve-library-id", { args: { ... } 
 
 ### High-level helpers
 
-Some servers benefit from composable workflows. `createContext7Client` layers on top of the proxy to resolve an ID and fetch docs in one call:
+You can compose higher-level helpers yourself with plain JavaScript. Because the proxy already maps positional arguments to schema fields, a tiny wrapper is enough to resolve a Context7 library ID and fetch the docs:
 
 ```ts
-import { createContext7Client, createRuntime } from "mcp-runtime";
+const context7 = createServerProxy(mcpRuntime, "context7");
 
-const runtime = await createRuntime();
-const context7 = createContext7Client(runtime);
-
-const docs = await context7.getDocs("react"); // resolves ID + downloads markdown
-console.log(docs.markdown());
-
-await runtime.close();
+async function getContext7Docs(libraryName: string) {
+	const resolution = await context7.resolveLibraryId(libraryName);
+	const id =
+		resolution.json<{ candidates?: Array<{ context7CompatibleLibraryID?: string }> }>()
+			?.candidates?.find((candidate) => candidate?.context7CompatibleLibraryID)
+			?.context7CompatibleLibraryID ??
+		resolution
+			.text()
+			?.match(/Context7-compatible library ID:\s*([^\s]+)/)?.[1];
+	if (!id) {
+		throw new Error(`Context7 library "${libraryName}" not found.`);
+	}
+	return context7.getLibraryDocs(id);
+}
 ```
 
-The helper still returns a `CallResult`, so you can opt into `.json()` / `.text()` as needed.
+The returned value is still a `CallResult`, so you can opt into `.markdown()`, `.json()`, etc.
 
 ## Testing & CI
 

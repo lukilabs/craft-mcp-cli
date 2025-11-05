@@ -29,6 +29,7 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
   - Tool signature + schema fetching for `list`.
 - Provide lazy connection pooling per server to minimize startup cost.
 - Expose a lightweight server proxy (`createServerProxy`) that maps camelCase method accesses to tool names, fills JSON-schema defaults, validates required arguments, and returns a helper (`CallResult`) for extracting text/markdown/JSON without re-parsing the content envelope.
+- Document direct (inline) server definitions passed to `createRuntime({ servers: [...] })`, including env-sourced headers, so agents can bootstrap without touching config files.
 
 ## Schema-Aware Proxy Strategy
 - Cache tool schemas on first access; tolerate failures by falling back to raw `callTool`.
@@ -39,7 +40,7 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
   - Merging JSON-schema defaults and validating required fields before dispatch.
 - Return `CallResult` objects exposing `.raw`, `.text()`, `.markdown()`, `.json()` helpers for consistent post-processing.
 - Keep implementation generic—no hardcoded knowledge of specific servers—so new MCP servers automatically gain the ergonomic API.
-- Surface composability helpers (e.g., `createContext7Client`) that compose multiple proxy calls while still delegating schema parsing to the proxy.
+- Encourage lightweight composition helpers in examples (e.g., resolving then fetching Context7 docs) while keeping library exports generic.
 - Back the proxy with targeted unit tests that cover primitive-only calls, positional tuples + option bags, and error fallbacks when schemas are missing.
 
 ## Work Phases

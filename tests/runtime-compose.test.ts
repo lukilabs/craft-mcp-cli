@@ -127,9 +127,11 @@ describe("mcp-runtime composability", () => {
 			servers: [
 				{
 					name: "fake",
+					description: "Inline fake server",
 					command: {
 						kind: "http" as const,
 						url: new URL("https://example.com"),
+						headers: { Authorization: "Bearer inline-test" },
 					},
 				},
 			],
@@ -146,6 +148,16 @@ describe("mcp-runtime composability", () => {
 		]);
 		expect(mocks.connectMock).toHaveBeenCalledTimes(1);
 		expect(mocks.clientInstances).toHaveLength(1);
+		const streamableTransport = mocks.streamableInstances[0] as {
+			options?: {
+				requestInit?: { headers?: Record<string, string> };
+				authProvider?: unknown;
+			};
+			close: ReturnType<typeof vi.fn>;
+		};
+		expect(streamableTransport.options?.requestInit?.headers).toEqual({
+			Authorization: "Bearer inline-test",
+		});
 
 		const first = await runtime.callTool("fake", "echo", {
 			args: { text: "hi" },
@@ -170,9 +182,6 @@ describe("mcp-runtime composability", () => {
 		await runtime.close();
 
 		expect(mocks.streamableInstances).toHaveLength(1);
-		const streamableTransport = mocks.streamableInstances[0] as {
-			close: ReturnType<typeof vi.fn>;
-		};
 		expect(streamableTransport.close).toHaveBeenCalledTimes(1);
 	});
 });
