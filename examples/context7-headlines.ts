@@ -5,34 +5,41 @@
  * and print only the markdown headlines.
  */
 
-import { createRuntime } from "../src/runtime.js";
+import { createRuntime, createServerProxy } from "../src/index.ts";
 
 async function main(): Promise<void> {
   const runtime = await createRuntime();
+  const context7 = createServerProxy(runtime, "context7");
   try {
-    const [{ structuredContent: libraries }] = (await runtime.callTool(
-      "context7",
-      "resolve-library-id",
-      {
-        args: { libraryName: "react" },
-      },
-    )) as [{ structuredContent?: Array<{ id: string }> }];
-
-    const target = libraries?.[0]?.id;
+    const resolveResult = await context7.resolveLibraryId({ libraryName: "react" });
+    const resultText = Array.isArray(resolveResult?.content)
+      ? resolveResult.content
+          .map((entry) =>
+            entry && typeof entry === "object" && "text" in entry
+              ? String(entry.text ?? "")
+              : "",
+          )
+          .join("\n")
+      : "";
+    const idMatch = resultText.match(
+      /Context7-compatible library ID:\s*([^\s]+)/,
+    );
+    const target = idMatch?.[1];
     if (!target) {
-      console.error("No library ID resolved for React.");
+      console.error("No Context7-compatible library ID resolved for React.");
       return;
     }
 
-    const docs = (await runtime.callTool("context7", "get-library-docs", {
-      args: { context7CompatibleLibraryID: target },
-    })) as [
-      {
-        structuredContent?: { markdown?: string };
-      },
-    ];
-
-    const markdown = docs[0]?.structuredContent?.markdown ?? "";
+    const docs = await context7.getLibraryDocs({ context7CompatibleLibraryID: target });
+    const markdown = Array.isArray(docs?.content)
+      ? docs.content
+          .map((entry) =>
+            entry && typeof entry === "object" && "text" in entry
+              ? String(entry.text ?? "")
+              : "",
+          )
+          .join("\n")
+      : "";
     const headlines = markdown
       .split("\n")
       .filter((line) => /^#+\s/.test(line))

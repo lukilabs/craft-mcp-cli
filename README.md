@@ -103,6 +103,20 @@ The package exports a thin runtime that lets you compose multiple MCP calls and 
 
 Use the pattern to build richer automations—batch fetch docs, search with Context7, or pass results into another MCP server without shelling out to the CLI.
 
+Prefer the `createServerProxy` helper when you want an ergonomic proxy object for a server:
+
+```ts
+import { createRuntime, createServerProxy } from "mcp-runtime";
+
+const runtime = await createRuntime();
+const context7 = createServerProxy(runtime, "context7");
+
+const search = await context7.resolveLibraryId({ libraryName: "react" });
+const docs = await context7.getLibraryDocs({ context7CompatibleLibraryID: "/websites/react_dev" });
+```
+
+Every property access maps from camelCase to the underlying tool name automatically (`resolveLibraryId` → `resolve-library-id`). You can still drop down to `context7.call("resolve-library-id", { args: { ... } })` when you need explicit control.
+
 ## Testing & CI
 
 | Command | Purpose |

@@ -8,3 +8,4 @@ export type {
 	ServerToolInfo,
 } from "./runtime.js";
 export { callOnce, createRuntime } from "./runtime.js";
+export { createServerProxy } from "./server-proxy.js";

@@ -18,6 +18,7 @@ Both scripts forward straight to the TypeScript CLI (`src/cli.ts`), so they supp
 - `pnpm mcp:list` – enumerate all configured servers; pass a specific name to inspect tool signatures.
 - `pnpm mcp:list <name> --schema` – dump the full JSON schema for each tool exposed by `<name>`.
 - `pnpm mcp:call` – execute a tool using either loose `key=value` pairs or `--args` JSON; append `--tail-log` to follow log files reported by the response.
+- Prefer `createServerProxy(runtime, "serverName")` in Node scripts when you want to call tools via `camelCase` methods instead of remembering the exact kebab-case names.
 
 ## Adding or Updating Servers
 
