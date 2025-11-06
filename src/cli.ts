@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import type { ChildProcess } from 'node:child_process';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { CliArtifactMetadata, SerializedServerDefinition } from './cli-metadata.js';
 import { readCliMetadata } from './cli-metadata.js';
@@ -11,6 +12,11 @@ import { generateCli } from './generate-cli.js';
 import { createRuntime } from './runtime.js';
 
 type FlagMap = Partial<Record<string, string>>;
+
+type ProcessWithHandles = NodeJS.Process & {
+  _getActiveHandles?: () => unknown[];
+  _getActiveRequests?: () => unknown[];
+};
 
 function logInfo(message: string) {
   // Log an info-level message with the standard prefix.
@@ -82,7 +88,28 @@ async function main(): Promise<void> {
       return;
     }
   } finally {
-    await runtime.close().catch(() => {});
+    const closeStart = Date.now();
+    if (DEBUG_HANG) {
+      logInfo('[debug] beginning runtime.close()');
+      dumpActiveHandles('before runtime.close');
+    }
+    try {
+      await runtime.close();
+      if (DEBUG_HANG) {
+        const duration = Date.now() - closeStart;
+        logInfo(`[debug] runtime.close() completed in ${duration}ms`);
+        dumpActiveHandles('after runtime.close');
+      }
+    } catch (error) {
+      if (DEBUG_HANG) {
+        logError('[debug] runtime.close() failed', error);
+      }
+    } finally {
+      terminateChildProcesses('runtime.finally');
+      if (DEBUG_HANG) {
+        dumpActiveHandles('after terminateChildProcesses');
+      }
+    }
   }
 
   printHelp(`Unknown command '${command}'.`);
@@ -235,20 +262,51 @@ function expectValue(flag: string, value: string | undefined): string {
   return value;
 }
 
-const LIST_TIMEOUT_MS = Number.parseInt(process.env.MCPORTER_LIST_TIMEOUT ?? '30000', 10);
-const CALL_TIMEOUT_MS = Number.parseInt(process.env.MCPORTER_CALL_TIMEOUT ?? '60000', 10);
+const DEFAULT_LIST_TIMEOUT_MS = 30_000;
+const DEFAULT_CALL_TIMEOUT_MS = 60_000;
+const DEBUG_HANG = process.env.MCPORTER_DEBUG_HANG === '1';
+
+function parseTimeout(raw: string | undefined, fallback: number): number {
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+const LIST_TIMEOUT_MS = parseTimeout(process.env.MCPORTER_LIST_TIMEOUT, DEFAULT_LIST_TIMEOUT_MS);
+
+export function resolveCallTimeout(override?: number): number {
+  if (typeof override === 'number' && Number.isFinite(override) && override > 0) {
+    return override;
+  }
+  return parseTimeout(process.env.MCPORTER_CALL_TIMEOUT, DEFAULT_CALL_TIMEOUT_MS);
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   // Race the original promise with a timeout to keep CLI responsive.
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return promise;
   }
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout')), timeoutMs);
-    }),
-  ]) as Promise<T>;
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Timeout'));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
@@ -714,7 +772,7 @@ export async function handleCall(runtime: Awaited<ReturnType<typeof createRuntim
     throw new Error('Missing tool name. Provide it via <server>.<tool> or --tool.');
   }
 
-  const timeoutMs = parsed.timeoutMs ?? CALL_TIMEOUT_MS;
+  const timeoutMs = resolveCallTimeout(parsed.timeoutMs);
   let result: unknown;
   try {
     result = await withTimeout(runtime.callTool(server, tool, { args: parsed.args }), timeoutMs);
@@ -736,15 +794,18 @@ export async function handleCall(runtime: Awaited<ReturnType<typeof createRuntim
       const decoded = JSON.parse(result);
       console.log(JSON.stringify(decoded, null, 2));
       tailLogIfRequested(decoded, parsed.tailLog ?? false);
+      dumpActiveHandles('after call (string result)');
     } catch {
       console.log(result);
       tailLogIfRequested(result, parsed.tailLog ?? false);
+      dumpActiveHandles('after call (raw string result)');
     }
     return;
   }
 
   console.log(JSON.stringify(result, null, 2));
   tailLogIfRequested(result, parsed.tailLog ?? false);
+  dumpActiveHandles('after call (object result)');
 }
 
 // extractListFlags captures list-specific options such as --schema.
@@ -793,6 +854,71 @@ function formatPathForDisplay(filePath: string): string {
       ? relative
       : filePath.replace(os.homedir(), '~');
   return displayPath;
+}
+
+function describeHandle(handle: unknown): string {
+  if (!handle || (typeof handle !== 'object' && typeof handle !== 'function')) {
+    return String(handle);
+  }
+  const ctor = (handle as { constructor?: { name?: string } }).constructor?.name ?? typeof handle;
+  if (typeof handle === 'object') {
+    const pid = (handle as { pid?: number }).pid;
+    if (typeof pid === 'number') {
+      return `${ctor} (pid=${pid})`;
+    }
+    const fd = (handle as { fd?: number }).fd;
+    if (typeof fd === 'number') {
+      return `${ctor} (fd=${fd})`;
+    }
+  }
+  return ctor;
+}
+
+function dumpActiveHandles(label: string): void {
+  if (!DEBUG_HANG) {
+    return;
+  }
+  const proc = process as ProcessWithHandles;
+  const activeHandles = proc._getActiveHandles?.() ?? [];
+  const activeRequests = proc._getActiveRequests?.() ?? [];
+  logInfo(`[debug] ${label}: ${activeHandles.length} active handle(s), ${activeRequests.length} request(s)`);
+  for (const handle of activeHandles) {
+    logInfo(`[debug] handle => ${describeHandle(handle)}`);
+  }
+  for (const request of activeRequests) {
+    logInfo(`[debug] request => ${describeHandle(request)}`);
+  }
+}
+
+function terminateChildProcesses(label: string): void {
+  const proc = process as ProcessWithHandles;
+  const handles = proc._getActiveHandles?.() ?? [];
+  for (const handle of handles) {
+    if (!handle || typeof handle !== 'object') {
+      continue;
+    }
+    const candidate = handle as ChildProcess;
+    if (DEBUG_HANG) {
+      logInfo(
+        `[debug] inspect child handle: ${describeHandle(handle)} kill=${typeof candidate.kill} killed=${
+          (candidate as { killed?: boolean }).killed ?? false
+        }`
+      );
+    }
+    if (typeof candidate.unref === 'function') {
+      candidate.unref();
+      if (DEBUG_HANG) {
+        logInfo(`[debug] called unref on child pid=${candidate.pid ?? 'unknown'} (${label})`);
+      }
+    }
+    if (typeof candidate.kill === 'function' && typeof candidate.pid === 'number' && !candidate.killed) {
+      const killed = candidate.kill('SIGKILL');
+      if (DEBUG_HANG) {
+        const outcome = killed ? 'killed' : 'kill-failed';
+        logWarn(`[debug] forcibly ${outcome} child pid=${candidate.pid} (${label})`);
+      }
+    }
+  }
 }
 
 interface CallArgsParseResult {

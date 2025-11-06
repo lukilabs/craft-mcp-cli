@@ -4,6 +4,16 @@ process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
 
 describe('CLI call argument parsing', () => {
+  it('falls back to default call timeout when env is empty', async () => {
+    vi.stubEnv('MCPORTER_CALL_TIMEOUT', '');
+    try {
+      const { resolveCallTimeout } = await cliModulePromise;
+      expect(resolveCallTimeout()).toBe(60_000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('accepts server and tool as separate positional arguments', async () => {
     const { parseCallArguments } = await cliModulePromise;
     const parsed = parseCallArguments(['chrome-devtools', 'list_pages']);
