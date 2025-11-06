@@ -144,9 +144,10 @@ export async function handleList(
     definition.command.kind === 'http'
       ? `HTTP ${definition.command.url instanceof URL ? definition.command.url.href : String(definition.command.url)}`
       : `STDIO ${[definition.command.command, ...(definition.command.args ?? [])].join(' ')}`.trim();
-  const serverSummary = `${definition.description ?? '<none>'}${transportSummary ? ` [${transportSummary}]` : ''}`;
+  const descriptionText = definition.description ?? '<none>';
+  const trailingSummary = `${descriptionText}${transportSummary ? ` [${transportSummary}]` : ''}`;
   const headerLabel = boldText(target);
-  console.log(`${headerLabel} - ${serverSummary}`);
+  console.log(`${headerLabel} ${dimText(`- ${trailingSummary}`)}`);
   console.log('');
   if (sourcePath) {
     console.log(`  Source: ${sourcePath}`);
