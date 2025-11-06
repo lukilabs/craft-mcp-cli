@@ -205,7 +205,6 @@ describe('CLI list classification', () => {
 
     const rawLines = logSpy.mock.calls.map((call) => call.join(' '));
     const lines = rawLines.map(stripAnsi);
-    console.log(lines);
 
     const headerLine = lines.find((line) => line.trim().startsWith('calculator -'));
     expect(headerLine).toBeDefined();
@@ -214,7 +213,7 @@ describe('CLI list classification', () => {
     expect(detailLine).toMatch(/ms/);
     expect(detailLine).toContain('HTTP https://example.com/mcp');
     expect(lines.some((line) => line.includes('// Add two numbers'))).toBe(true);
-    throw new Error(JSON.stringify(lines, null, 2));
+    expect(lines.some((line) => line.includes('add(a: number'))).toBe(true);
     expect(lines.some((line) => line.includes('First operand'))).toBe(true);
     expect(lines.some((line) => line.includes('format?:'))).toBe(false);
     expect(lines.some((line) => line.includes('dueBefore?:'))).toBe(false);
@@ -279,9 +278,6 @@ describe('CLI list classification', () => {
     expect(lines.some((line) => line.includes('dueBefore?: string'))).toBe(true);
     expect(lines.some((line) => line.includes('mcporter call calculator.add(a: 1, format: "json")'))).toBe(true);
     expect(lines.some((line) => line.includes('-> result:'))).toBe(true);
-    expect(
-      lines.filter((line) => line.includes('Optional parameters hidden; run with --include-optional'))
-    ).toHaveLength(0);
     expect(listToolsSpy).toHaveBeenCalledWith('calculator', { includeSchema: true });
 
     logSpy.mockRestore();

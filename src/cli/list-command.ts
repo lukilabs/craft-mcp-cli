@@ -461,12 +461,13 @@ function formatOptionalNote(omittedOptions: GeneratedOption[]): string | undefin
     return undefined;
   }
   const names = omittedOptions.map((option) => option.property);
-  return extraDimText(`// optional (${names.length}): ${names.join(', ')}`);
+  const truncated = names.length > 5 ? [...names.slice(0, 5), '…'] : names;
+  return extraDimText(`// optional (${names.length}): ${truncated.join(', ')}`);
 }
 
 function formatReturnLines(schema: unknown): string[] | undefined {
   if (!schema || typeof schema !== 'object') {
-    return [`-> result: ${dimText('unknown')}`];
+    return undefined;
   }
   const record = schema as Record<string, unknown>;
   const type = typeof record.type === 'string' ? (record.type as string) : undefined;
