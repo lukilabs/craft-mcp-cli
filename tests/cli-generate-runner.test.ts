@@ -29,6 +29,18 @@ describe('generate-cli runner internals', () => {
     expect(inferred).toBe('linear');
   });
 
+  it('splits stdio commands and infers names from args', () => {
+    const args = ['--command', 'npx -y chrome-devtools-mcp@latest'];
+    const parsed = generateInternals.parseGenerateFlags([...args]);
+    expect(parsed.command).toBeDefined();
+    expect(typeof parsed.command).toBe('object');
+    const spec = parsed.command as { command: string; args?: string[] };
+    expect(spec.command).toBe('npx');
+    expect(spec.args).toEqual(['-y', 'chrome-devtools-mcp@latest']);
+    const inferred = parsed.command !== undefined ? generateInternals.inferNameFromCommand(parsed.command) : undefined;
+    expect(inferred).toContain('chrome-devtools');
+  });
+
   it('builds regenerate commands honoring global flags and invocation overrides', () => {
     const definition: SerializedServerDefinition = {
       name: 'demo',

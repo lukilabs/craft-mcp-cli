@@ -150,7 +150,7 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, '-');
 }
 
-function splitCommandLine(input: string): string[] {
+export function splitCommandLine(input: string): string[] {
   const result: string[] = [];
   let current = '';
   let inSingle = false;

@@ -2,6 +2,7 @@ import type { CliArtifactMetadata, SerializedServerDefinition } from '../cli-met
 import { readCliMetadata } from '../cli-metadata.js';
 import type { GenerateCliOptions } from '../generate-cli.js';
 import { generateCli } from '../generate-cli.js';
+import { splitCommandLine } from './adhoc-server.js';
 import type { FlagMap } from './flag-utils.js';
 import { expectValue } from './flag-utils.js';
 import { extractGeneratorFlags } from './generate/flag-parser.js';
@@ -10,7 +11,7 @@ import { extractHttpServerTarget, looksLikeHttpUrl, normalizeHttpUrlCandidate } 
 export interface GenerateFlags {
   server?: string;
   name?: string;
-  command?: string;
+  command?: CommandInput;
   description?: string;
   output?: string;
   bundle?: boolean | string;
@@ -84,11 +85,7 @@ export async function handleGenerateCli(args: string[], globalFlags: FlagMap): P
   const serverRef =
     parsed.server ??
     (parsed.command && inferredName
-      ? JSON.stringify({
-          name: inferredName,
-          command: parsed.command,
-          ...(parsed.description ? { description: parsed.description } : {}),
-        })
+      ? JSON.stringify(buildInlineServerDefinition(inferredName, parsed.command, parsed.description))
       : undefined);
   if (!serverRef) {
     throw new Error(
@@ -206,7 +203,7 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
   const common = extractGeneratorFlags(args);
   let server: string | undefined;
   let name: string | undefined;
-  let command: string | undefined;
+  let command: CommandInput | undefined;
   let description: string | undefined;
   let output: string | undefined;
   let bundle: boolean | string | undefined;
@@ -314,29 +311,80 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
   };
 }
 
-function normalizeCommandInput(value: string): string {
-  const target = extractHttpServerTarget(value);
-  return target ?? value;
+type CommandInput = string | InlineCommandSpec;
+
+interface InlineCommandSpec {
+  command: string;
+  args?: string[];
 }
 
-function inferNameFromCommand(command: string): string | undefined {
-  const trimmed = command.trim();
-  if (!trimmed) {
+function buildInlineServerDefinition(
+  name: string,
+  command: CommandInput,
+  description?: string
+): Record<string, unknown> {
+  const base: Record<string, unknown> = { name };
+  if (description) {
+    base.description = description;
+  }
+  if (typeof command === 'string') {
+    base.command = command;
+    return base;
+  }
+  base.command = command.command;
+  if (command.args && command.args.length > 0) {
+    base.args = command.args;
+  }
+  return base;
+}
+
+function inferNameFromCommand(command: CommandInput): string | undefined {
+  if (typeof command === 'string') {
+    const trimmed = command.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const candidate = normalizeHttpUrlCandidate(trimmed) ?? trimmed;
+    try {
+      const url = new URL(candidate);
+      const derived = deriveNameFromUrl(url);
+      if (derived) {
+        return derived;
+      }
+    } catch {
+      // not a URL; fall through to filesystem heuristics
+    }
+    const firstToken = trimmed.split(/\s+/)[0] ?? trimmed;
+    const candidateToken = firstToken.split(/[\\/]/).pop() ?? firstToken;
+    return slugify(candidateToken.replace(/\.[a-z0-9]+$/i, ''));
+  }
+  const parts = [command.command, ...(command.args ?? [])];
+  if (parts.length === 0) {
     return undefined;
   }
-  const candidate = normalizeHttpUrlCandidate(trimmed) ?? trimmed;
-  try {
-    const url = new URL(candidate);
-    const derived = deriveNameFromUrl(url);
-    if (derived) {
-      return derived;
-    }
-  } catch {
-    // not a URL; fall through to filesystem heuristics
+  const script = parts.find((part) => /\.[cm]?(ts|js)x?$/i.test(part));
+  if (script) {
+    return slugify(basename(script));
   }
-  const firstToken = trimmed.split(/\s+/)[0] ?? trimmed;
-  const candidateToken = firstToken.split(/[\\/]/).pop() ?? firstToken;
-  return candidateToken.replace(/\.[a-z0-9]+$/i, '');
+  const packageArg = parts.find((_part, index) => index > 0 && /[@/]/.test(_part));
+  if (packageArg) {
+    return slugify(packageArg.replace(/^@/, '').split('@')[0] ?? packageArg);
+  }
+  return slugify(basename(parts[0] ?? 'command'));
+}
+
+function slugify(value: string): string | undefined {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || undefined;
+}
+
+function basename(value: string): string {
+  const segments = value.split(/[\\/]/);
+  return segments[segments.length - 1] ?? value;
 }
 
 function deriveNameFromUrl(url: URL): string | undefined {
@@ -368,6 +416,23 @@ function deriveNameFromUrl(url: URL): string | undefined {
     return firstSegment.replace(/[^a-zA-Z0-9-_]/g, '-');
   }
   return undefined;
+}
+
+function parseInlineCommand(value: string): InlineCommandSpec {
+  const parts = splitCommandLine(value.trim());
+  if (parts.length === 0) {
+    throw new Error('--command requires a non-empty value.');
+  }
+  const [binary, ...rest] = parts as [string, ...string[]];
+  return rest.length > 0 ? { command: binary, args: rest } : { command: binary };
+}
+
+function normalizeCommandInput(value: string): CommandInput {
+  const target = extractHttpServerTarget(value);
+  if (target) {
+    return target;
+  }
+  return parseInlineCommand(value);
 }
 
 export const __test = {

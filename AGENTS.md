@@ -35,3 +35,11 @@
 ## Security & Configuration Tips
 - Keep secrets out of the repo; pass credentials via environment variables when exercising MCP servers.
 - Local scripts under `scripts/` (e.g., `mcp_signoz_retry_patch.cjs`) are safe shims for Sweetistics workflows—review them before extending.
+
+## Common mcporter Workflows & Shortcuts
+- **List configured servers**: `npx mcporter list [--json]` shows health, counts, and hints; re-run with `--server <name>` for focused detail.
+- **Ad-hoc HTTP**: `npx mcporter call https://host/path.toolName(arg: "value")` automatically infers transport; add `--allow-http` for plain HTTP.
+- **Ad-hoc stdio / third-party packages**: `npx mcporter call --stdio "npx -y package@latest" --name friendly-name <tool>` launches transient MCP servers (ideal for Chrome DevTools or Playwright friends with no config).
+- **Generate standalone CLIs**: `npx mcporter generate-cli <server-or-adhoc-flags> --output cli.ts [--bundle dist/cli.js --compile]` embeds schema+commands; combine with `--stdio`/`--http-url` to avoid editing configs.
+- **Emit typed clients**: `npx mcporter emit-ts <server> --mode client --out clients/name.ts [--include-optional]` for TypeScript interfaces + helper factories (use `--mode types` for `.d.ts` only).
+- **Inspect/Regenerate artifacts**: `npx mcporter inspect-cli dist/thing.js` prints metadata and replay command; `npx mcporter generate-cli --from dist/thing.js` reruns with the latest mcporter.
