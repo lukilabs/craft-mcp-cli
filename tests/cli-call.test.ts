@@ -250,8 +250,41 @@ describe('CLI call argument parsing', () => {
     await expect(handleCall(runtime, ['linear.listIssues'])).rejects.toThrow(failure.message);
 
     expect(listTools).not.toHaveBeenCalled();
-    expect(errorSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toContain('appears offline');
 
+    errorSpy.mockRestore();
+  });
+
+  it('reports when servers appear offline after call failures', async () => {
+    const { handleCall } = await cliModulePromise;
+    const failure = new Error('fetch failed: connect ECONNREFUSED 127.0.0.1:9999');
+    const runtime = {
+      callTool: vi.fn().mockRejectedValue(failure),
+      listTools: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(handleCall(runtime, ['linear.listIssues'])).rejects.toThrow(failure.message);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toContain('appears offline');
+    errorSpy.mockRestore();
+  });
+
+  it('reports stdio exit codes when transports terminate', async () => {
+    const { handleCall } = await cliModulePromise;
+    const failure = new Error('STDIO transport exited with code 1 (signal SIGTERM)');
+    const runtime = {
+      callTool: vi.fn().mockRejectedValue(failure),
+      listTools: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(handleCall(runtime, ['chrome-devtools.list_pages'])).rejects.toThrow(failure.message);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toContain('STDIO server for chrome-devtools exited with code 1');
     errorSpy.mockRestore();
   });
 

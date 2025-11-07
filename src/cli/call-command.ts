@@ -1,3 +1,4 @@
+import { analyzeConnectionError } from '../error-classifier.js';
 import { wrapCallResult } from '../result-utils.js';
 import type { EphemeralServerSpec } from './adhoc-server.js';
 import { parseCallExpressionFragment } from './call-expression-parser.js';
@@ -13,7 +14,7 @@ import {
 } from './identifier-helpers.js';
 import { type OutputFormat, printCallOutput, tailLogIfRequested } from './output-utils.js';
 import { dumpActiveHandles } from './runtime-debug.js';
-import { dimText } from './terminal.js';
+import { dimText, redText, yellowText } from './terminal.js';
 import { consumeTimeoutFlag, resolveCallTimeout, withTimeout } from './timeouts.js';
 import { loadToolMetadata } from './tool-cache.js';
 
@@ -463,6 +464,7 @@ async function attemptCall(
 
     const resolution = await maybeResolveToolName(runtime, server, tool, error);
     if (!resolution) {
+      maybeReportConnectionIssue(server, tool, error);
       throw error;
     }
 
@@ -544,4 +546,43 @@ function buildCallExpressionUsageError(error: unknown): CliUsageError {
     'Tip: wrap the entire expression in single quotes so the shell preserves parentheses and commas.',
   ];
   return new CliUsageError(lines.join('\n'));
+}
+
+function maybeReportConnectionIssue(server: string, tool: string, error: unknown): void {
+  const issue = analyzeConnectionError(error);
+  const detail = summarizeIssueMessage(issue.rawMessage);
+  if (issue.kind === 'auth') {
+    const authCommand = `mcporter auth ${server}`;
+    const hint = `[mcporter] Authorization required for ${server}. Run '${authCommand}'.${detail ? ` (${detail})` : ''}`;
+    console.error(yellowText(hint));
+    return;
+  }
+  if (issue.kind === 'offline') {
+    const hint = `[mcporter] ${server} appears offline${detail ? ` (${detail})` : ''}.`;
+    console.error(redText(hint));
+    return;
+  }
+  if (issue.kind === 'http') {
+    const status = issue.statusCode ? `HTTP ${issue.statusCode}` : 'an HTTP error';
+    const hint = `[mcporter] ${server}.${tool} responded with ${status}${detail ? ` (${detail})` : ''}.`;
+    console.error(dimText(hint));
+    return;
+  }
+  if (issue.kind === 'stdio-exit') {
+    const exit = typeof issue.stdioExitCode === 'number' ? `code ${issue.stdioExitCode}` : 'an unknown status';
+    const signal = issue.stdioSignal ? ` (signal ${issue.stdioSignal})` : '';
+    const hint = `[mcporter] STDIO server for ${server} exited with ${exit}${signal}.`;
+    console.error(redText(hint));
+  }
+}
+
+function summarizeIssueMessage(message: string): string {
+  if (!message) {
+    return '';
+  }
+  const trimmed = message.trim();
+  if (trimmed.length <= 120) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 117)}…`;
 }
