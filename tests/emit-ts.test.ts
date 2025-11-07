@@ -104,4 +104,22 @@ describe('handleEmitTs', () => {
     expect(payload.server).toBe('integration');
     logSpy.mockRestore();
   });
+
+  it('emits JSON summaries for client mode', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'emit-ts-json-client-'));
+    const runtime = createRuntimeStub();
+    const clientPath = path.join(tmpDir, 'integration-client.ts');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await handleEmitTs(runtime, ['integration', '--out', clientPath, '--mode', 'client', '--json']);
+    const payload = JSON.parse(logSpy.mock.calls.at(-1)?.[0] ?? '{}');
+    expect(payload.mode).toBe('client');
+    expect(payload.clientOutPath).toBe(clientPath);
+    expect(payload.typesOutPath.endsWith('.d.ts')).toBe(true);
+    const typesExists = await fs
+      .access(payload.typesOutPath)
+      .then(() => true)
+      .catch(() => false);
+    expect(typesExists).toBe(true);
+    logSpy.mockRestore();
+  });
 });

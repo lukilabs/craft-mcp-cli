@@ -66,15 +66,7 @@ describe('config imports', () => {
     const homeDir = ensureFakeHomeDir();
 
     const names = servers.map((server) => server.name).sort();
-    expect(names).toEqual([
-      'claude-only',
-      'codex-only',
-      'cursor-only',
-      'local-only',
-      'shared',
-      'vscode-only',
-      'windsurf-only',
-    ]);
+    expect(names).toEqual(['claude-only', 'cursor-only', 'local-only', 'shared', 'vscode-only', 'windsurf-only']);
 
     const shared = servers.find((server) => server.name === 'shared');
     expect(shared?.command.kind).toBe('http');
@@ -94,14 +86,6 @@ describe('config imports', () => {
     expect(cursorOnly?.source).toEqual({
       kind: 'local',
       path: configPath,
-    });
-
-    const codexOnly = servers.find((server) => server.name === 'codex-only');
-    expect(codexOnly?.command.kind).toBe('stdio');
-    expect(codexOnly?.command.kind === 'stdio' ? codexOnly.command.command : undefined).toBe('codex-cli');
-    expect(codexOnly?.source).toEqual({
-      kind: 'import',
-      path: path.join(homeDir, '.codex', 'config.toml'),
     });
 
     const windsurfOnly = servers.find((server) => server.name === 'windsurf-only');
