@@ -15,11 +15,19 @@
 11. git commit && git push.
 12. pnpm publish --tag latest
 13. `npm view mcporter version` (and `npm view mcporter time`) to ensure the registry reflects the new release before proceeding.
-14. Create a GitHub release, upload mcporter-macos-arm64-v<version>.tar.gz (with the SHA from step 8), and record the release URL. Double-check the uploaded checksum matches step 8.
-15. Tag the release (git tag v<version> && git push --tags).
-16. Update `steipete/homebrew-tap` → `Formula/mcporter.rb` with the new version, tarball URL, and SHA256. Refresh the tap README highlights and changelog snippets so Homebrew users see the new version callouts.
-17. Commit and push the tap update.
-18. Verify the Homebrew flow (after GitHub release assets propagate):
+14. Sanity-check the “one weird trick” workflow from a **completely empty** directory (no package.json/node_modules) via:
+    ```bash
+    rm -rf /tmp/mcporter-empty && mkdir -p /tmp/mcporter-empty
+    cd /tmp/mcporter-empty
+    npx mcporter@<version> generate-cli "npx -y chrome-devtools-mcp" --compile
+    ./chrome-devtools-mcp --help | head -n 5
+    ```
+    Only continue once the CLI compiles and the help banner prints.
+15. Create a GitHub release, upload mcporter-macos-arm64-v<version>.tar.gz (with the SHA from step 8), and record the release URL. Double-check the uploaded checksum matches step 8.
+16. Tag the release (git tag v<version> && git push --tags).
+17. Update `steipete/homebrew-tap` → `Formula/mcporter.rb` with the new version, tarball URL, and SHA256. Refresh the tap README highlights and changelog snippets so Homebrew users see the new version callouts.
+18. Commit and push the tap update.
+19. Verify the Homebrew flow (after GitHub release assets propagate):
     ```bash
     brew update
     brew install steipete/tap/mcporter
