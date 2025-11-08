@@ -20,6 +20,8 @@ export type {
   CommandSpec,
   HttpCommand,
   LoadConfigOptions,
+  RawConfig,
+  RawEntry,
   ServerDefinition,
   ServerSource,
   StdioCommand,
@@ -27,8 +29,7 @@ export type {
 
 export async function loadServerDefinitions(options: LoadConfigOptions = {}): Promise<ServerDefinition[]> {
   const rootDir = options.rootDir ?? process.cwd();
-  const { path: configPath, explicit } = resolveConfigPath(options.configPath, rootDir);
-  const config = await readConfigFile(configPath, explicit);
+  const { config, path: configPath } = await loadRawConfig(options);
 
   const merged = new Map<string, { raw: RawEntry; baseDir: string; source: ServerSource }>();
 
@@ -75,7 +76,28 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
   return servers;
 }
 
-function resolveConfigPath(configPath: string | undefined, rootDir: string): { path: string; explicit: boolean } {
+export async function loadRawConfig(
+  options: LoadConfigOptions = {}
+): Promise<{ config: RawConfig; path: string; explicit: boolean }> {
+  const rootDir = options.rootDir ?? process.cwd();
+  const resolved = resolveConfigPath(options.configPath, rootDir);
+  const config = await readConfigFile(resolved.path, resolved.explicit);
+  return { config, ...resolved };
+}
+
+export async function writeRawConfig(targetPath: string, config: RawConfig): Promise<void> {
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+  const serialized = `${JSON.stringify(config, null, 2)}\n`;
+  await fs.writeFile(targetPath, serialized, 'utf8');
+}
+
+export function resolveConfigPath(
+  configPath: string | undefined,
+  rootDir: string
+): {
+  path: string;
+  explicit: boolean;
+} {
   if (configPath) {
     return { path: path.resolve(configPath), explicit: true };
   }

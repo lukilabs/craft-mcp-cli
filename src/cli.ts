@@ -4,6 +4,7 @@ import fsPromises from 'node:fs/promises';
 import type { EphemeralServerSpec } from './cli/adhoc-server.js';
 import { handleCall as runHandleCall } from './cli/call-command.js';
 import { inferCommandRouting } from './cli/command-inference.js';
+import { handleConfigCli } from './cli/config-command.js';
 import { handleEmitTs } from './cli/emit-ts-command.js';
 import { extractEphemeralServerFlags } from './cli/ephemeral-flags.js';
 import { prepareEphemeralServerTarget } from './cli/ephemeral-target.js';
@@ -95,6 +96,17 @@ export async function runCli(argv: string[]): Promise<void> {
     logger: getActiveLogger(),
     oauthTimeoutMs: oauthTimeoutOverride,
   };
+
+  if (command === 'config') {
+    await handleConfigCli(
+      {
+        loadOptions: { configPath: runtimeOptions.configPath, rootDir: runtimeOptions.rootDir },
+        invokeAuth: (authArgs) => invokeAuthCommand(runtimeOptions, authArgs),
+      },
+      args
+    );
+    return;
+  }
 
   if (command === 'emit-ts') {
     const runtime = await createRuntime(runtimeOptions);
@@ -257,6 +269,16 @@ function buildCommandSections(colorize: boolean): string[] {
           name: 'emit-ts',
           summary: 'Generate TypeScript client/types for a server',
           usage: 'mcporter emit-ts <server> --mode client|types [options]',
+        },
+      ],
+    },
+    {
+      title: 'Configuration',
+      entries: [
+        {
+          name: 'config',
+          summary: 'Inspect or edit config files (list, get, add, remove, import, login, logout)',
+          usage: 'mcporter config <command> [options]',
         },
       ],
     },
@@ -434,6 +456,15 @@ export async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntim
       }
       throw new Error(`Failed to authorize '${target}': ${message}`);
     }
+  }
+}
+
+async function invokeAuthCommand(runtimeOptions: Parameters<typeof createRuntime>[0], args: string[]): Promise<void> {
+  const runtime = await createRuntime(runtimeOptions);
+  try {
+    await handleAuth(runtime, args);
+  } finally {
+    await runtime.close().catch(() => {});
   }
 }
 
