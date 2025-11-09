@@ -6,6 +6,7 @@ import { splitHttpToolSelector } from './http-utils.js';
 import { consumeOutputFormat } from './output-format.js';
 import type { OutputFormat } from './output-utils.js';
 import { consumeTimeoutFlag } from './timeouts.js';
+import { parseJsonValue } from './json-input.js';
 
 export interface CallArgsParseResult {
   selector?: string;
@@ -17,9 +18,10 @@ export interface CallArgsParseResult {
   output: OutputFormat;
   timeoutMs?: number;
   ephemeral?: EphemeralServerSpec;
+  editMode?: boolean;
 }
 
-export function parseCallArguments(args: string[]): CallArgsParseResult {
+export async function parseCallArguments(args: string[]): Promise<CallArgsParseResult> {
   const result: CallArgsParseResult = { args: {}, tailLog: false, output: 'auto' };
   const ephemeral = extractEphemeralServerFlags(args);
   result.ephemeral = ephemeral;
@@ -68,13 +70,18 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
       index += 1;
       continue;
     }
+    if (token === '--edit') {
+      result.editMode = true;
+      index += 1;
+      continue;
+    }
     if (token === '--args') {
       const value = args[index + 1];
       if (!value) {
         throw new Error('--args requires a JSON value.');
       }
       try {
-        const decoded = JSON.parse(value);
+        const decoded = await parseJsonValue(value);
         if (decoded === null || typeof decoded !== 'object' || Array.isArray(decoded)) {
           throw new Error('--args must be a JSON object.');
         }
@@ -155,7 +162,7 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
       continue;
     }
     index += parsed.consumed;
-    const value = coerceValue(parsed.rawValue);
+    const value = await coerceValueAsync(parsed.rawValue);
     if ((parsed.key === 'tool' || parsed.key === 'command') && !result.tool) {
       if (typeof value !== 'string') {
         throw new Error("Argument 'tool' must be a string value.");
@@ -175,6 +182,12 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
   if (trailingPositional.length > 0) {
     result.positionalArgs = [...(result.positionalArgs ?? []), ...trailingPositional];
   }
+
+  // Enable edit mode by default if no args were provided
+  if (Object.keys(result.args).length === 0 && !result.positionalArgs && !result.editMode) {
+    result.editMode = true;
+  }
+
   return result;
 }
 
@@ -260,6 +273,22 @@ function coerceValue(value: string): unknown {
     }
   }
   return trimmed;
+}
+
+async function coerceValueAsync(value: string): Promise<unknown> {
+  const trimmed = value.trim();
+
+  // If value starts with @ or is -, use parseJsonValue for file/stdin support
+  if (trimmed.startsWith('@') || trimmed === '-') {
+    try {
+      return await parseJsonValue(trimmed);
+    } catch (error) {
+      throw new Error(`Unable to parse value "${trimmed}": ${(error as Error).message}`);
+    }
+  }
+
+  // Otherwise use the synchronous coercion
+  return coerceValue(value);
 }
 
 function buildCallExpressionUsageError(error: unknown): CliUsageError {

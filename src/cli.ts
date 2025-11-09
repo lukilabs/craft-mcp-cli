@@ -100,7 +100,7 @@ export async function runCli(argv: string[]): Promise<void> {
   // Craft connection management commands
   if (command === 'add') {
     if (args.length < 2) {
-      console.error('Usage: craft add <name> <url> [--description <desc>]');
+      console.error('Usage: mcporter add <name> <url> [--description <desc>]');
       process.exit(1);
       return;
     }
@@ -122,7 +122,7 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === 'remove') {
     if (args.length === 0) {
-      console.error('Usage: craft remove <name>');
+      console.error('Usage: mcporter remove <name>');
       process.exit(1);
       return;
     }
@@ -140,7 +140,7 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === 'use') {
     if (args.length === 0) {
-      console.error('Usage: craft use <name>');
+      console.error('Usage: mcporter use <name>');
       process.exit(1);
       return;
     }
@@ -321,22 +321,22 @@ function buildCommandSections(colorize: boolean): string[] {
         {
           name: 'add',
           summary: 'Add a Craft MCP connection',
-          usage: 'craft add <name> <url> [--description <desc>]',
+          usage: 'mcporter add <name> <url> [--description <desc>]',
         },
         {
           name: 'remove',
           summary: 'Remove a Craft MCP connection',
-          usage: 'craft remove <name>',
+          usage: 'mcporter remove <name>',
         },
         {
           name: 'use',
           summary: 'Set default Craft connection',
-          usage: 'craft use <name>',
+          usage: 'mcporter use <name>',
         },
         {
           name: 'connections',
           summary: 'List all Craft connections',
-          usage: 'craft connections',
+          usage: 'mcporter connections',
         },
       ],
     },

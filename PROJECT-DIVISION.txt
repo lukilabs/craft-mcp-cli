@@ -12,11 +12,25 @@ Project Division: Craft CLI Implementation
   ⏳ Phase 5: PENDING - SDK & Package Configuration
 
   Commits:
-  - 3747d60: Phase 1 implementation
+  - 3747d60: Phase 1 implementation (craft-validation.ts, craft-config.ts)
   - 71d784e: Phase 2 implementation with config management
-  - 7a38d80: Improved type auto-discovery (part of Phase 3)
+  - 7a38d80: Improved type auto-discovery (part of Phase 2)
   - c643372: Merge both phases into main
   - e5224c6: Phase 3 implementation - connection routing
+  - 130d5ab: Update PROJECT-DIVISION.txt status
+
+  Current Files Status:
+  ✅ src/craft-validation.ts - exists
+  ✅ src/craft-config.ts - exists (with type auto-discovery)
+  ✅ src/cli/json-input.ts - exists
+  ✅ src/cli/command-inference.ts - modified for connection routing
+  ✅ src/cli.ts - modified with connection commands
+  ✅ src/cli/call-command.ts - accepts defaultConnection
+  ✅ src/cli/list-command.ts - accepts defaultConnection
+  ❌ src/cli/call-arguments.ts - NOT YET async, doesn't use parseJsonValue
+  ❌ src/craft-runtime.ts - doesn't exist
+  ❌ src/sdk.ts - doesn't exist
+  ❌ package.json - still named "mcporter", not rebranded
   ===============================================================================
 
   Phase 1: Foundation & Validation ✅ COMPLETE
@@ -156,17 +170,26 @@ Project Division: Craft CLI Implementation
 
   After each phase:
   - ✅ Phase 1: Infrastructure ready (types compile, config management implemented)
-  - ✅ Phase 2: JSON parsing system implemented (not yet integrated into CLI)
-  - ⏳ Phase 3: craft <connection> tools routing works
-  - ⏳ Phase 4: craft <connection> <tool> with all arg formats works
-  - ⏳ Phase 5: SDK imports work, package builds cleanly
+  - ✅ Phase 2: JSON parsing system implemented (parseJsonValue, openEditorForArgs ready)
+  - ✅ Phase 3: Connection routing works (craft <connection> list/call commands)
+  - ⏳ Phase 4: Enhanced argument parsing (--args @file, --edit, stdin support)
+  - ⏳ Phase 5: SDK exports & package rebranding (craft-mcp-cli published)
 
   ---
   Next Steps
 
-  To complete Phase 3:
-  1. Modify src/cli/command-inference.ts for connection routing
-  2. Update src/cli.ts with connection management commands
-  3. Update src/cli/list-command.ts to show connection types
-  4. Test: craft add, craft list, craft use, craft <connection> tools
+  To complete Phase 4 (Enhanced Arguments Integration):
+  1. Modify src/cli/call-arguments.ts:
+     - Make parseCallArguments() async
+     - Import parseJsonValue from json-input.ts
+     - Use parseJsonValue for --args flag parsing
+     - Add --edit flag detection
+     - Apply parseJsonValue to individual key=value arguments
+  2. Update src/cli/call-command.ts:
+     - Handle --edit mode by calling openEditorForArgs()
+  3. Test all argument input methods:
+     - craft <tool> --args @file.json
+     - craft <tool> --args -  (stdin)
+     - craft <tool> --edit
+     - craft <tool> key=@file.json
 

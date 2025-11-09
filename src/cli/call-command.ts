@@ -21,7 +21,7 @@ export async function handleCall(
   args: string[],
   defaultConnection?: string
 ): Promise<void> {
-  const parsed = parseCallArguments(args);
+  const parsed = await parseCallArguments(args);
   let ephemeralSpec = parsed.ephemeral ? { ...parsed.ephemeral } : undefined;
 
   // If no server specified but defaultConnection provided, use the connection
@@ -83,6 +83,19 @@ export async function handleCall(
   }
 
   const { server, tool } = resolveCallTarget(parsed);
+
+  // Handle edit mode - open editor for arguments if enabled
+  if (parsed.editMode) {
+    const { openEditorForArgs } = await import('./json-input.js');
+    const tools = await loadToolMetadata(runtime, server, { includeSchema: true });
+    const toolInfo = tools.find((entry) => entry.tool.name === tool);
+    if (!toolInfo || !toolInfo.tool.inputSchema) {
+      throw new Error(`Tool '${tool}' does not expose an input schema; cannot use --edit mode.`);
+    }
+    const editorArgs = await openEditorForArgs(toolInfo.tool);
+    // Merge editor args with any existing args (editor takes precedence)
+    Object.assign(parsed.args, editorArgs);
+  }
 
   const timeoutMs = resolveCallTimeout(parsed.timeoutMs);
   const hydratedArgs = await hydratePositionalArguments(runtime, server, tool, parsed.args, parsed.positionalArgs);
