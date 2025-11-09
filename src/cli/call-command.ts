@@ -18,10 +18,23 @@ import { loadToolMetadata } from './tool-cache.js';
 
 export async function handleCall(
   runtime: Awaited<ReturnType<typeof import('../runtime.js')['createRuntime']>>,
-  args: string[]
+  args: string[],
+  defaultConnection?: string
 ): Promise<void> {
   const parsed = parseCallArguments(args);
   let ephemeralSpec = parsed.ephemeral ? { ...parsed.ephemeral } : undefined;
+
+  // If no server specified but defaultConnection provided, use the connection
+  if (!parsed.server && !ephemeralSpec && defaultConnection) {
+    const { getConnection } = await import('../craft-config.js');
+    try {
+      const conn = await getConnection(defaultConnection);
+      ephemeralSpec = { httpUrl: conn.url, name: conn.name };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to resolve connection '${defaultConnection}': ${message}`);
+    }
+  }
 
   const nameHints: string[] = [];
   const absorbUrlCandidate = (value: string | undefined): string | undefined => {

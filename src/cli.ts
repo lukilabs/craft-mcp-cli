@@ -22,6 +22,13 @@ import { boldText, dimText, extraDimText, supportsAnsiColor } from './cli/termin
 import { analyzeConnectionError } from './error-classifier.js';
 import { parseLogLevel } from './logging.js';
 import { createRuntime, MCPORTER_VERSION } from './runtime.js';
+import {
+  addConnection,
+  removeConnection,
+  listConnections,
+  useConnection,
+  getDefaultConnection,
+} from './craft-config.js';
 
 export { parseCallArguments } from './cli/call-arguments.js';
 export { handleCall } from './cli/call-command.js';
@@ -90,6 +97,76 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // Craft connection management commands
+  if (command === 'add') {
+    if (args.length < 2) {
+      console.error('Usage: craft add <name> <url> [--description <desc>]');
+      process.exit(1);
+      return;
+    }
+
+    const name = args[0]!;
+    const url = args[1]!;
+    const descIndex = args.indexOf('--description');
+    const description = descIndex !== -1 && args[descIndex + 1] ? args[descIndex + 1] : undefined;
+
+    try {
+      await addConnection(name, url, description);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'remove') {
+    if (args.length === 0) {
+      console.error('Usage: craft remove <name>');
+      process.exit(1);
+      return;
+    }
+
+    const name = args[0]!;
+    try {
+      await removeConnection(name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'use') {
+    if (args.length === 0) {
+      console.error('Usage: craft use <name>');
+      process.exit(1);
+      return;
+    }
+
+    const name = args[0]!;
+    try {
+      await useConnection(name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'connections') {
+    try {
+      await listConnections();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(message);
+      process.exit(1);
+    }
+    return;
+  }
+
   const runtimeOptions = {
     configPath: globalFlags['--config'],
     rootDir: globalFlags['--root'],
@@ -120,13 +197,14 @@ export async function runCli(argv: string[]): Promise<void> {
 
   const runtime = await createRuntime(runtimeOptions);
 
-  const inference = inferCommandRouting(command, args, runtime.getDefinitions());
+  const inference = await inferCommandRouting(command, args, runtime.getDefinitions());
   if (inference.kind === 'abort') {
     process.exitCode = inference.exitCode;
     return;
   }
   const resolvedCommand = inference.command;
   const resolvedArgs = inference.args;
+  const defaultConnection = inference.kind === 'command' ? inference.defaultConnection : undefined;
 
   try {
     if (resolvedCommand === 'list') {
@@ -135,12 +213,12 @@ export async function runCli(argv: string[]): Promise<void> {
         process.exitCode = 0;
         return;
       }
-      await handleList(runtime, resolvedArgs);
+      await handleList(runtime, resolvedArgs, defaultConnection);
       return;
     }
 
     if (resolvedCommand === 'call') {
-      await runHandleCall(runtime, resolvedArgs);
+      await runHandleCall(runtime, resolvedArgs, defaultConnection);
       return;
     }
 
@@ -237,6 +315,31 @@ type HelpSection = {
 
 function buildCommandSections(colorize: boolean): string[] {
   const sections: HelpSection[] = [
+    {
+      title: 'Craft connections',
+      entries: [
+        {
+          name: 'add',
+          summary: 'Add a Craft MCP connection',
+          usage: 'craft add <name> <url> [--description <desc>]',
+        },
+        {
+          name: 'remove',
+          summary: 'Remove a Craft MCP connection',
+          usage: 'craft remove <name>',
+        },
+        {
+          name: 'use',
+          summary: 'Set default Craft connection',
+          usage: 'craft use <name>',
+        },
+        {
+          name: 'connections',
+          summary: 'List all Craft connections',
+          usage: 'craft connections',
+        },
+      ],
+    },
     {
       title: 'Core commands',
       entries: [

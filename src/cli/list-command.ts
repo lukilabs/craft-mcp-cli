@@ -71,10 +71,25 @@ type ListOutputFormat = 'text' | 'json';
 
 export async function handleList(
   runtime: Awaited<ReturnType<typeof import('../runtime.js')['createRuntime']>>,
-  args: string[]
+  args: string[],
+  defaultConnection?: string
 ): Promise<void> {
   const flags = extractListFlags(args);
   let target = args.shift();
+
+  // If no target specified but defaultConnection provided, use the connection
+  if (!target && defaultConnection) {
+    const { getConnection } = await import('../craft-config.js');
+    try {
+      const conn = await getConnection(defaultConnection);
+      target = conn.url;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(message);
+      process.exit(1);
+      return;
+    }
+  }
 
   if (target) {
     const split = splitHttpToolSelector(target);

@@ -1,19 +1,42 @@
 import type { ServerDefinition } from '../config.js';
+import { loadCraftConfig } from '../craft-config.js';
 import { looksLikeHttpUrl, splitHttpToolSelector } from './http-utils.js';
 import { chooseClosestIdentifier, renderIdentifierResolutionMessages } from './identifier-helpers.js';
 import { dimText, yellowText } from './terminal.js';
 
-type CommandResult = { kind: 'command'; command: string; args: string[] } | { kind: 'abort'; exitCode: number };
+type CommandResult =
+  | { kind: 'command'; command: string; args: string[]; defaultConnection?: string }
+  | { kind: 'abort'; exitCode: number };
 
 const CALL_TOKEN_PATTERN = /[.(]/;
 
-export function inferCommandRouting(
+export async function inferCommandRouting(
   token: string,
   args: string[],
   definitions: readonly ServerDefinition[]
-): CommandResult {
+): Promise<CommandResult> {
   if (!token) {
     return { kind: 'command', command: token, args };
+  }
+
+  // Check for Craft connection routing first
+  try {
+    const craftConfig = await loadCraftConfig();
+    const connectionMatch = craftConfig.connections.find((c) => c.name === token);
+
+    if (connectionMatch) {
+      // Connection name found: craft <connection> <command>
+      const nextToken = args[0];
+      if (!nextToken) {
+        // No command after connection name, list tools by default
+        return { kind: 'command', command: 'list', args: [], defaultConnection: token };
+      }
+      // Remove the next token from args and infer command with remaining args
+      const remainingArgs = args.slice(1);
+      return { kind: 'command', command: nextToken, args: remainingArgs, defaultConnection: token };
+    }
+  } catch (error) {
+    // If Craft config fails to load, continue with normal routing
   }
 
   if (isExplicitCommand(token)) {
