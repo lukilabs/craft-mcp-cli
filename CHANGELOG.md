@@ -4,6 +4,55 @@
 
 _No changes yet._
 
+## [1.0.0] - 2025-11-10
+
+**BREAKING CHANGES:** This release rebrands the package as `craft-mcp-cli` with a Craft-first focus.
+
+### Package & Branding
+- **Package renamed** from `mcporter` to `craft-mcp-cli`
+- **Binary renamed** to `craft` (with `mcporter` alias for backward compatibility)
+- **Config file renamed** from `config/mcporter.json` to `config/craft.json`
+- All CLI help text, logging, and documentation updated to use "craft" branding
+
+### Craft-Specific Features
+- **Craft connection management** via `~/.craft/config.json`
+  - `craft add <name> <url>` - Add Craft MCP connections
+  - `craft remove <name>` - Remove connections
+  - `craft use <name>` - Set default connection
+  - `craft connections` - List all connections
+- **Auto-discovery** - Automatically detects connection type (doc vs daily-notes)
+- **Isolated config** - Uses `createCraftRuntime()` to bypass mcporter config loading
+  - Eliminates conflicts with editor MCP imports
+  - Only loads Craft connections from `~/.craft/config.json`
+
+### Enhanced CLI
+- **Simplified command syntax:**
+  - `craft list` - Show Craft connections (not generic MCP servers)
+  - `craft tools` - List tools for default connection
+  - `craft <toolName>` - Call tool on default connection
+  - `craft <connection> <toolName>` - Call tool on specific connection
+- **Removed auto-edit behavior** - Editor only opens with explicit `--edit` flag
+- **Craft-aware command inference** - Prioritizes Craft connections over generic servers
+
+### TypeScript SDK
+- **New SDK exports** in main package export:
+  - `createCraftRuntime()` - Craft-only runtime (bypasses config loading)
+  - `craftCallOnce()` - One-shot tool calls
+  - `createCraftClient()` - Persistent client
+  - Connection management: `addConnection`, `getConnection`, `listConnections`, etc.
+- **Type exports:** `CraftConnection`, `CraftConnectionType`, `CraftConfig`
+
+### Documentation
+- **New Craft-focused README** with quick start guide
+- **Updated help text** - All examples use `craft` command
+- **Migration guide** for mcporter users
+
+### Technical Changes
+- Default config path changed from `./config/mcporter.json` to `./config/craft.json`
+- Logger prefix changed from `[mcporter]` to `[craft]`
+- Command routing now passes empty definitions array to prioritize Craft connections
+- Help footer updated to reference `~/.craft/config.json`
+
 ## [0.4.2] - 2025-11-09
 
 ### CLI & runtime

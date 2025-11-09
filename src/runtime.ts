@@ -489,7 +489,7 @@ function waitForAuthorizationCodeWithTimeout(
 
 // createConsoleLogger produces the default runtime logger honoring MCPORTER_LOG_LEVEL.
 function createConsoleLogger(level: LogLevel = resolveLogLevelFromEnv()): RuntimeLogger {
-  return createPrefixedConsoleLogger('mcporter', level);
+  return createPrefixedConsoleLogger('craft', level);
 }
 
 export { readJsonFile, writeJsonFile } from './fs-json.js';

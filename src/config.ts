@@ -101,7 +101,7 @@ export function resolveConfigPath(
   if (configPath) {
     return { path: path.resolve(configPath), explicit: true };
   }
-  return { path: path.resolve(rootDir, 'config', 'mcporter.json'), explicit: false };
+  return { path: path.resolve(rootDir, 'config', 'craft.json'), explicit: false };
 }
 
 async function readConfigFile(configPath: string, explicit: boolean): Promise<RawConfig> {

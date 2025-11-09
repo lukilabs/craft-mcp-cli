@@ -36,7 +36,7 @@ export function normalizeServerEntry(
       cwd: baseDir,
     };
   } else {
-    throw new Error(`Server '${name}' is missing a baseUrl/url or command definition in mcporter.json`);
+    throw new Error(`Server '${name}' is missing a baseUrl/url or command definition in craft.json`);
   }
 
   const resolvedTokenCacheDir =

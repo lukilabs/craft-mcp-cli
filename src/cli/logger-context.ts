@@ -1,7 +1,7 @@
 import { createPrefixedConsoleLogger, type Logger, type LogLevel, resolveLogLevelFromEnv } from '../logging.js';
 
 let activeLogLevel: LogLevel = resolveLogLevelFromEnv();
-let activeLogger: Logger = createPrefixedConsoleLogger('mcporter', activeLogLevel);
+let activeLogger: Logger = createPrefixedConsoleLogger('craft', activeLogLevel);
 
 export function getActiveLogLevel(): LogLevel {
   return activeLogLevel;
@@ -13,7 +13,7 @@ export function getActiveLogger(): Logger {
 
 export function setLogLevel(level: LogLevel): void {
   activeLogLevel = level;
-  activeLogger = createPrefixedConsoleLogger('mcporter', activeLogLevel);
+  activeLogger = createPrefixedConsoleLogger('craft', activeLogLevel);
 }
 
 export function setLogger(logger: Logger, level?: LogLevel): void {

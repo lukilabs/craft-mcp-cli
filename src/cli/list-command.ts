@@ -77,6 +77,31 @@ export async function handleList(
   const flags = extractListFlags(args);
   let target = args.shift();
 
+  // Special case: `craft list` with no args shows Craft connections
+  if (!target && !defaultConnection && !flags.ephemeral) {
+    const { loadCraftConfig, listConnections } = await import('../craft-config.js');
+    const config = await loadCraftConfig();
+
+    // If there are Craft connections, show them instead of generic server list
+    if (config.connections.length > 0) {
+      await listConnections();
+      return;
+    }
+    // Otherwise fall through to show generic server list
+  }
+
+  // If target is provided, check if it's a connection name
+  if (target && !target.includes('://') && !target.includes('.')) {
+    const { loadCraftConfig } = await import('../craft-config.js');
+    const config = await loadCraftConfig();
+    const connection = config.connections.find((c) => c.name === target);
+
+    if (connection) {
+      // It's a connection name, use its URL
+      target = connection.url;
+    }
+  }
+
   // If no target specified but defaultConnection provided, use the connection
   if (!target && defaultConnection) {
     const { getConnection } = await import('../craft-config.js');
@@ -338,11 +363,13 @@ export async function handleList(
 
 export function printListHelp(): void {
   const lines = [
-    'Usage: mcporter list [server | url] [flags]',
+    'Usage: craft list [connection | server | url] [flags]',
     '',
     'Targets:',
-    '  <name>                 Use a server from config/mcporter.json or editor imports.',
-    '  https://host/mcp       List an HTTP server directly; mcporter infers the entry.',
+    '  (none)                 List all Craft connections',
+    '  <connection>           List tools for a Craft connection by name',
+    '  <name>                 Use a server from config/craft.json (advanced)',
+    '  https://host/mcp       List an HTTP server directly',
     '',
     'Ad-hoc servers:',
     '  --http-url <url>       Register an HTTP server for this run.',
@@ -353,7 +380,7 @@ export function printListHelp(): void {
     '  --cwd <path>           Working directory for stdio servers.',
     '  --name <value>         Override the display name for ad-hoc servers.',
     '  --description <text>   Override the description for ad-hoc servers.',
-    '  --persist <path>       Write the ad-hoc definition to config/mcporter.json.',
+    '  --persist <path>       Write the ad-hoc definition to config/craft.json.',
     '  --yes                  Skip confirmation prompts when persisting.',
     '',
     'Display flags:',
@@ -363,10 +390,10 @@ export function printListHelp(): void {
     '  --timeout <ms>         Override the per-server discovery timeout.',
     '',
     'Examples:',
-    '  mcporter list',
-    '  mcporter list linear --schema',
-    '  mcporter list https://mcp.example.com/mcp',
-    '  mcporter list --http-url https://localhost:3333/mcp --schema',
+    '  craft list',
+    '  craft list work',
+    '  craft list work --schema',
+    '  craft list https://mcp.craft.do/links/XXX/mcp',
   ];
   console.error(lines.join('\n'));
 }

@@ -183,10 +183,8 @@ export async function parseCallArguments(args: string[]): Promise<CallArgsParseR
     result.positionalArgs = [...(result.positionalArgs ?? []), ...trailingPositional];
   }
 
-  // Enable edit mode by default if no args were provided
-  if (Object.keys(result.args).length === 0 && !result.positionalArgs && !result.editMode) {
-    result.editMode = true;
-  }
+  // Edit mode is only enabled if explicitly requested via --edit flag
+  // (removed auto-edit behavior for better UX)
 
   return result;
 }

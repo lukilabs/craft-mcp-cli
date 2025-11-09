@@ -22,12 +22,14 @@ import { boldText, dimText, extraDimText, supportsAnsiColor } from './cli/termin
 import { analyzeConnectionError } from './error-classifier.js';
 import { parseLogLevel } from './logging.js';
 import { createRuntime, MCPORTER_VERSION } from './runtime.js';
+import { createCraftRuntime } from './craft-runtime.js';
 import {
   addConnection,
   removeConnection,
   listConnections,
   useConnection,
   getDefaultConnection,
+  getConnection,
 } from './craft-config.js';
 
 export { parseCallArguments } from './cli/call-arguments.js';
@@ -100,7 +102,7 @@ export async function runCli(argv: string[]): Promise<void> {
   // Craft connection management commands
   if (command === 'add') {
     if (args.length < 2) {
-      console.error('Usage: mcporter add <name> <url> [--description <desc>]');
+      console.error('Usage: craft add <name> <url> [--description <desc>]');
       process.exit(1);
       return;
     }
@@ -122,7 +124,7 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === 'remove') {
     if (args.length === 0) {
-      console.error('Usage: mcporter remove <name>');
+      console.error('Usage: craft remove <name>');
       process.exit(1);
       return;
     }
@@ -140,7 +142,7 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === 'use') {
     if (args.length === 0) {
-      console.error('Usage: mcporter use <name>');
+      console.error('Usage: craft use <name>');
       process.exit(1);
       return;
     }
@@ -164,6 +166,31 @@ export async function runCli(argv: string[]): Promise<void> {
       logError(message);
       process.exit(1);
     }
+    return;
+  }
+
+  if (command === 'tools') {
+    const connectionName = args[0];
+
+    // Create Craft-only runtime (bypasses mcporter config loading)
+    const runtime = await createCraftRuntime(connectionName, {
+      logger: getActiveLogger(),
+      oauthTimeoutMs: oauthTimeoutOverride,
+    });
+
+    const { handleList } = await import('./cli/list-command.js');
+
+    // Get the connection name from the runtime
+    const conn = connectionName ? await getConnection(connectionName) : await getDefaultConnection();
+    if (!conn) {
+      console.error('No default connection set. Use: craft use <name>');
+      process.exit(1);
+      return;
+    }
+
+    // Pass the connection URL as the target
+    await handleList(runtime, [conn.url, ...args.slice(connectionName ? 1 : 0)], undefined);
+    await runtime.close();
     return;
   }
 
@@ -195,9 +222,9 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
-  const runtime = await createRuntime(runtimeOptions);
-
-  const inference = await inferCommandRouting(command, args, runtime.getDefinitions());
+  // Infer command without loading mcporter config (pass empty definitions)
+  // This allows Craft connection routing to work properly
+  const inference = await inferCommandRouting(command, args, []);
   if (inference.kind === 'abort') {
     process.exitCode = inference.exitCode;
     return;
@@ -205,6 +232,12 @@ export async function runCli(argv: string[]): Promise<void> {
   const resolvedCommand = inference.command;
   const resolvedArgs = inference.args;
   const defaultConnection = inference.kind === 'command' ? inference.defaultConnection : undefined;
+
+  // Create Craft-only runtime (bypasses mcporter config loading)
+  const runtime = await createCraftRuntime(defaultConnection, {
+    logger: getActiveLogger(),
+    oauthTimeoutMs: oauthTimeoutOverride,
+  });
 
   try {
     if (resolvedCommand === 'list') {
@@ -284,12 +317,12 @@ function printHelp(message?: string): void {
   const quickStart = formatQuickStart(colorize);
   const footer = formatHelpFooter(colorize);
   const title = colorize
-    ? `${boldText('mcporter')} ${dimText('— Model Context Protocol CLI & generator')}`
-    : 'mcporter — Model Context Protocol CLI & generator';
+    ? `${boldText('craft')} ${dimText('— Craft MCP CLI & SDK')}`
+    : 'craft — Craft MCP CLI & SDK';
   const lines = [
     title,
     '',
-    'Usage: mcporter <command> [options]',
+    'Usage: craft <command> [options]',
     '',
     ...sections,
     '',
@@ -321,22 +354,22 @@ function buildCommandSections(colorize: boolean): string[] {
         {
           name: 'add',
           summary: 'Add a Craft MCP connection',
-          usage: 'mcporter add <name> <url> [--description <desc>]',
+          usage: 'craft add <name> <url> [--description <desc>]',
         },
         {
           name: 'remove',
           summary: 'Remove a Craft MCP connection',
-          usage: 'mcporter remove <name>',
+          usage: 'craft remove <name>',
         },
         {
           name: 'use',
           summary: 'Set default Craft connection',
-          usage: 'mcporter use <name>',
+          usage: 'craft use <name>',
         },
         {
           name: 'connections',
           summary: 'List all Craft connections',
-          usage: 'mcporter connections',
+          usage: 'craft connections',
         },
       ],
     },
@@ -345,18 +378,28 @@ function buildCommandSections(colorize: boolean): string[] {
       entries: [
         {
           name: 'list',
-          summary: 'List configured servers (add --schema for tool docs)',
-          usage: 'mcporter list [name] [--schema] [--json]',
+          summary: 'List Craft connections or tools',
+          usage: 'craft list [connection] [--schema]',
         },
         {
-          name: 'call',
-          summary: 'Call a tool by selector (server.tool) or HTTP URL; key=value flags supported',
-          usage: 'mcporter call <selector> [key=value ...]',
+          name: 'tools',
+          summary: 'List tools for default or specified connection',
+          usage: 'craft tools [connection]',
+        },
+        {
+          name: '<tool>',
+          summary: 'Call a tool on default connection',
+          usage: 'craft <toolName> [key=value ...]',
+        },
+        {
+          name: '<connection> <tool>',
+          summary: 'Call a tool on specific connection',
+          usage: 'craft <connection> <toolName> [key=value ...]',
         },
         {
           name: 'auth',
-          summary: 'Complete OAuth for a server without listing tools',
-          usage: 'mcporter auth <server | url> [--reset]',
+          summary: 'Complete OAuth for a connection',
+          usage: 'craft auth <connection | url> [--reset]',
         },
       ],
     },
@@ -366,17 +409,17 @@ function buildCommandSections(colorize: boolean): string[] {
         {
           name: 'generate-cli',
           summary: 'Emit a standalone CLI (supports HTTP, stdio, and inline commands)',
-          usage: 'mcporter generate-cli --server <name> | --command <ref> [options]',
+          usage: 'craft generate-cli --server <name> | --command <ref> [options]',
         },
         {
           name: 'inspect-cli',
           summary: 'Show metadata and regen instructions for a generated CLI',
-          usage: 'mcporter inspect-cli <path> [--json]',
+          usage: 'craft inspect-cli <path> [--json]',
         },
         {
           name: 'emit-ts',
           summary: 'Generate TypeScript client/types for a server',
-          usage: 'mcporter emit-ts <server> --mode client|types [options]',
+          usage: 'craft emit-ts <server> --mode client|types [options]',
         },
       ],
     },
@@ -386,7 +429,7 @@ function buildCommandSections(colorize: boolean): string[] {
         {
           name: 'config',
           summary: 'Inspect or edit config files (list, get, add, remove, import, login, logout)',
-          usage: 'mcporter config <command> [options]',
+          usage: 'craft config <command> [options]',
         },
       ],
     },
@@ -413,7 +456,7 @@ function formatGlobalFlags(colorize: boolean): string {
   const entries = [
     {
       flag: '--config <path>',
-      summary: 'Path to mcporter.json (defaults to ./config/mcporter.json)',
+      summary: 'Path to craft.json (defaults to ./config/craft.json)',
     },
     {
       flag: '--root <path>',
@@ -435,10 +478,11 @@ function formatGlobalFlags(colorize: boolean): string {
 function formatQuickStart(colorize: boolean): string {
   const title = colorize ? boldText('Quick start') : 'Quick start';
   const entries = [
-    ['mcporter list', 'show configured servers'],
-    ['mcporter list linear --schema', 'view Linear tool docs'],
-    ['mcporter call linear.list_issues limit:5', 'invoke a tool with key=value arguments'],
-    ['mcporter generate-cli --command https://host/mcp --compile ./my-cli', 'build a standalone CLI/binary'],
+    ['craft add work https://mcp.craft.do/links/XXX/mcp', 'add a Craft connection'],
+    ['craft list', 'show all connections'],
+    ['craft tools', 'list tools for default connection'],
+    ['craft collections_list', 'call a tool on default connection'],
+    ['craft work blocks_get id:123', 'call a tool on specific connection'],
   ];
   const formatted = entries.map(([cmd, note]) => {
     const comment = colorize ? dimText(`# ${note}`) : `# ${note}`;
@@ -448,9 +492,9 @@ function formatQuickStart(colorize: boolean): string {
 }
 
 function formatHelpFooter(colorize: boolean): string {
-  const pointer = 'Run `mcporter <command> --help` for detailed flags.';
+  const pointer = 'Run `craft <command> --help` for detailed flags.';
   const autoLoad =
-    'mcporter auto-loads servers from ./config/mcporter.json and editor imports (Cursor, Claude, Codex, etc.).';
+    'craft uses Craft connections from ~/.craft/config.json (add with: craft add <name> <url>)';
   if (!colorize) {
     return `${pointer}\n${autoLoad}`;
   }
@@ -535,7 +579,7 @@ export async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntim
   target = prepared.target;
 
   if (!target) {
-    throw new Error('Usage: mcporter auth <server | url> [--http-url <url> | --stdio <command>]');
+    throw new Error('Usage: craft auth <server | url> [--http-url <url> | --stdio <command>]');
   }
 
   const definition = runtime.getDefinition(target);

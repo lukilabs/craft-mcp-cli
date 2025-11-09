@@ -1,15 +1,15 @@
 {
-  "name": "mcporter",
-  "version": "0.4.2",
-  "description": "TypeScript runtime and CLI for connecting to configured Model Context Protocol servers.",
+  "name": "craft-mcp-cli",
+  "version": "1.0.0",
+  "description": "CLI and SDK for Craft documents via Model Context Protocol",
   "type": "module",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/sdk.js",
+  "module": "./dist/sdk.js",
+  "types": "./dist/sdk.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/sdk.js",
+      "types": "./dist/sdk.d.ts"
     },
     "./cli": {
       "import": "./dist/cli.js",
@@ -17,9 +17,11 @@
     }
   },
   "bin": {
+    "craft": "./dist/cli.js",
     "mcporter": "./dist/cli.js"
   },
   "scripts": {
+    "craft": "tsx src/cli.ts",
     "mcporter": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.build.json",
     "build:bun": "bun scripts/build-bun.ts",
@@ -69,12 +71,14 @@
     "url": "https://github.com/steipete/mcporter"
   },
   "keywords": [
+    "craft",
     "mcp",
     "model-context-protocol",
     "cli",
-    "sweetistics"
+    "sdk",
+    "craft-docs"
   ],
-  "author": "Sweetistics",
+  "author": "Moritz Rubner",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

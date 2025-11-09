@@ -51,7 +51,7 @@ export function resolveLogLevelFromEnv(
   } catch (error) {
     const raw = env.MCPORTER_LOG_LEVEL;
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[mcporter] Ignoring invalid MCPORTER_LOG_LEVEL value '${raw ?? ''}': ${message}`);
+    console.warn(`[craft] Ignoring invalid MCPORTER_LOG_LEVEL value '${raw ?? ''}': ${message}`);
     return defaultLevel;
   }
 }
