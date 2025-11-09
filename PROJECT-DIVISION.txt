@@ -1,0 +1,172 @@
+Project Division: Craft CLI Implementation
+
+  Based on the plan, here's how I'd divide this into 5 logical phases with clear boundaries:
+
+  ===============================================================================
+  COMPLETION STATUS (Updated: 2025-11-09)
+  ===============================================================================
+  ✅ Phase 1: COMPLETE - Foundation & Validation
+  ✅ Phase 2: COMPLETE - Enhanced JSON Input System
+  ✅ Phase 3: COMPLETE - CLI Integration - Connection Routing
+  ⏳ Phase 4: PENDING - Enhanced Arguments Integration
+  ⏳ Phase 5: PENDING - SDK & Package Configuration
+
+  Commits:
+  - 3747d60: Phase 1 implementation
+  - 71d784e: Phase 2 implementation with config management
+  - 7a38d80: Improved type auto-discovery (part of Phase 3)
+  - c643372: Merge both phases into main
+  - e5224c6: Phase 3 implementation - connection routing
+  ===============================================================================
+
+  Phase 1: Foundation & Validation ✅ COMPLETE
+
+  Dependencies: None | Can start immediately
+
+  Goal: Set up core validation and config infrastructure
+
+  Tasks:
+  1. ✅ Create src/craft-validation.ts
+    - ✅ Implement validateCraftUrl() function
+    - ⏳ Add tests for URL validation (deferred)
+  2. ✅ Create src/craft-config.ts
+    - ✅ Implement CraftConfig and CraftConnection types
+    - ✅ Implement loadCraftConfig(), saveCraftConfig()
+    - ✅ Implement addConnection(), removeConnection(), listConnections()
+    - ✅ Implement useConnection(), getDefaultConnection(), getConnection(), resolveConnection()
+    - ✅ Type auto-discovery implemented (completed in Phase 2)
+
+  Deliverable: ✅ Can manage connections in config file
+  craft add work https://mcp.craft.do/links/XXX/mcp
+  craft list
+  craft use work
+  craft remove work
+
+  ---
+  Phase 2: Enhanced JSON Input System ✅ COMPLETE
+
+  Dependencies: None (parallel to Phase 1) | Can start immediately
+
+  Goal: Build the multi-method JSON parsing system
+
+  Tasks:
+  1. ✅ Create src/cli/json-input.ts
+    - ✅ Implement parseJsonValue() (file, stdin, inline, empty)
+    - ✅ Implement generateTemplateFromSchema()
+    - ✅ Implement openEditorForArgs()
+    - ✅ Add helper generateExampleValue()
+
+  Deliverable: ✅ JSON input system ready to integrate
+  - ⏳ Unit tests passing for all 5 input methods (deferred)
+  - ✅ Editor mode working standalone
+
+  ---
+  Phase 3: CLI Integration - Connection Routing ✅ COMPLETE
+
+  Dependencies: Phase 1 complete | Needs config system
+
+  Goal: Wire connection management into the CLI
+
+  Tasks:
+  1. ✅ Modify src/cli/command-inference.ts
+    - ✅ Add connection-aware routing
+    - ✅ Update InferredCommand type with defaultConnection
+  2. ✅ Modify src/cli.ts
+    - ✅ Add connection management commands (add, remove, connections, use)
+    - ✅ Update branding/help text
+    - ✅ Import craft-config functions
+  3. ✅ Add type auto-discovery to src/craft-config.ts
+    - ✅ Implement discoverConnectionType() (completed in Phase 2)
+    - ✅ Integrate into addConnection() (completed in Phase 2)
+  4. ✅ Modify src/cli/list-command.ts
+    - ✅ Accept defaultConnection parameter and use connection URL
+  5. ✅ Modify src/cli/call-command.ts
+    - ✅ Accept defaultConnection parameter and create ephemeral server
+
+  Deliverable: Connection-based routing works
+  craft add work https://...
+  craft work list           # Lists tools for 'work' connection
+  craft work call <tool>    # Call tool on 'work' connection
+  craft call <tool>         # Uses default connection
+
+  ---
+  Phase 4: CLI Integration - Enhanced Arguments ⏳ PENDING
+
+  Dependencies: Phase 2 & 3 complete | Needs JSON input + routing
+
+  Goal: Integrate enhanced JSON parsing into tool calling
+
+  Tasks:
+  1. ⏳ Modify src/cli/call-arguments.ts
+    - ⏳ Make parseCallArguments() async
+    - ⏳ Integrate parseJsonValue() for --args flag
+    - ⏳ Add --edit flag detection
+    - ⏳ Apply parseJsonValue() to individual args (key=value patterns)
+    - ⏳ Update all return types
+  2. ⏳ Modify src/cli/call-command.ts
+    - ⏳ Accept defaultConnection parameter
+    - ⏳ Handle --edit mode (call openEditorForArgs())
+    - ⏳ Create ephemeral server from connection when needed
+
+  Deliverable: All argument input methods work
+  craft blocks_add --blocks @blocks.json
+  craft blocks_add --args -
+  craft blocks_add --edit
+
+  ---
+  Phase 5: SDK & Package Configuration ⏳ PENDING
+
+  Dependencies: Phase 1-4 complete | Needs everything working
+
+  Goal: Create programmatic SDK and finalize package
+
+  Tasks:
+  1. ⏳ Create src/craft-runtime.ts
+    - ⏳ Implement craftCallOnce()
+    - ⏳ Implement createCraftClient()
+  2. ⏳ Create src/sdk.ts
+    - ⏳ Export all SDK functions
+    - ⏳ Export types
+  3. ⏳ Update package.json
+    - ⏳ Change name to craft-mcp-cli
+    - ⏳ Update bin to craft
+    - ⏳ Update exports, main, types
+    - ⏳ Update metadata (description, keywords, author)
+  4. ⏳ Update tsconfig.build.json
+    - ⏳ Include all new files
+  5. ⏳ Create SDK examples/docs
+
+  Deliverable: SDK ready for npm publish
+  import { craftCallOnce, createCraftClient } from 'craft-mcp-cli';
+
+  const result = await craftCallOnce({
+    connection: 'work',
+    tool: 'collections_list'
+  });
+
+  ---
+  Parallelization Opportunities
+
+  - Phase 1 & 2 can run in parallel (no dependencies)
+  - Phase 3 & 4 should be sequential (4 depends on 3)
+  - Phase 5 requires all previous phases
+
+  ---
+  Testing Checkpoints
+
+  After each phase:
+  - ✅ Phase 1: Infrastructure ready (types compile, config management implemented)
+  - ✅ Phase 2: JSON parsing system implemented (not yet integrated into CLI)
+  - ⏳ Phase 3: craft <connection> tools routing works
+  - ⏳ Phase 4: craft <connection> <tool> with all arg formats works
+  - ⏳ Phase 5: SDK imports work, package builds cleanly
+
+  ---
+  Next Steps
+
+  To complete Phase 3:
+  1. Modify src/cli/command-inference.ts for connection routing
+  2. Update src/cli.ts with connection management commands
+  3. Update src/cli/list-command.ts to show connection types
+  4. Test: craft add, craft list, craft use, craft <connection> tools
+
