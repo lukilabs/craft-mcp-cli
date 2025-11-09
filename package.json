@@ -68,7 +68,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/steipete/mcporter"
+    "url": "https://github.com/lukilabs/craft-mcp-cli"
   },
   "keywords": [
     "craft",
