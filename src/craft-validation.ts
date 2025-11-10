@@ -11,9 +11,9 @@ export function validateCraftUrl(url: string): void {
     throw new Error(`Invalid URL: ${url}`);
   }
 
-  // Must be from craft.do domain
-  if (!parsed.hostname.endsWith('craft.do')) {
-    throw new Error(`Invalid Craft MCP URL. Must be from craft.do domain, got: ${parsed.hostname}`);
+  // Must be from craft.do domain (including subdomains)
+  if (!parsed.hostname.endsWith('.craft.do') && !parsed.hostname.endsWith('.luki.io')) {
+    throw new Error(`Invalid Craft MCP URL. Must be craft.do domain, got: ${parsed.hostname}`);
   }
 
   // Must include /mcp in path

@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ServerDefinition } from './config.js';
 import { validateCraftUrl } from './craft-validation.js';
+import { isUnauthorizedError } from './runtime-oauth-support.js';
 import { createRuntime } from './runtime.js';
 
 export type CraftConnectionType = 'doc' | 'daily-notes';
@@ -57,10 +58,14 @@ export async function saveCraftConfig(config: CraftConfig): Promise<void> {
   await fs.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
 }
 
+type DiscoveryResult =
+  | { type: CraftConnectionType }
+  | { type?: undefined; reason: 'auth' | 'other' };
+
 /**
  * Auto-discover connection type by connecting and inspecting tools
  */
-async function discoverConnectionType(url: string): Promise<CraftConnectionType | undefined> {
+async function discoverConnectionType(url: string): Promise<DiscoveryResult> {
   try {
     // Create ephemeral server definition
     const serverDef: ServerDefinition = {
@@ -89,22 +94,27 @@ async function discoverConnectionType(url: string): Promise<CraftConnectionType 
       const hasConnectionTimeGet = toolNames.includes('connection_time_get');
 
       if (hasConnectionTimeGet) {
-        return 'daily-notes';
+        return { type: 'daily-notes' };
       } else if (toolNames.length > 0) {
         // If it has tools but not connection_time_get, it's a doc server
-        return 'doc';
+        return { type: 'doc' };
       }
 
-      return undefined;
+      return { reason: 'other' };
     } finally {
       await runtime.close();
     }
   } catch (error) {
-    // If we can't connect or discover, return undefined
-    // Connection might require OAuth or be temporarily unavailable
+    // Check if this is an authentication error
+    if (isUnauthorizedError(error)) {
+      // Return auth reason without logging a warning
+      return { reason: 'auth' };
+    }
+
+    // For other errors, log a warning and return other reason
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(`Warning: Could not auto-discover type for ${url}: ${errorMessage}`);
-    return undefined;
+    return { reason: 'other' };
   }
 }
 
@@ -124,9 +134,16 @@ export async function addConnection(name: string, url: string, description?: str
 
   // Auto-discover type
   console.log(`Discovering connection type for ${name}...`);
-  const type = await discoverConnectionType(url);
-  if (type) {
+  const discoveryResult = await discoverConnectionType(url);
+  let type: CraftConnectionType | undefined;
+  
+  if ('type' in discoveryResult) {
+    type = discoveryResult.type;
     console.log(`✓ Detected type: ${type}`);
+  } else if (discoveryResult.reason === 'auth') {
+    console.log(
+      `⚠ Could not auto-detect type (authentication required). You can authenticate later with 'craft auth ${name}' or set the type manually.`
+    );
   } else {
     console.log(`⚠ Could not auto-detect type`);
   }

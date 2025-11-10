@@ -40,7 +40,7 @@ export function normalizeServerEntry(
   }
 
   const resolvedTokenCacheDir =
-    auth === 'oauth' ? (tokenCacheDir ?? path.join(os.homedir(), '.mcporter', name)) : (tokenCacheDir ?? undefined);
+    auth === 'oauth' ? (tokenCacheDir ?? path.join(os.homedir(), '.craft', name)) : (tokenCacheDir ?? undefined);
 
   return {
     name,

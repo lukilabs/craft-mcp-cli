@@ -13,13 +13,18 @@ import { isUnauthorizedError, maybeEnableOAuth } from './runtime-oauth-support.j
 import { closeTransportAndWait } from './runtime-process-utils.js';
 import './sdk-patches.js';
 
-const PACKAGE_NAME = 'mcporter';
+const PACKAGE_NAME = 'craft';
 const CLIENT_VERSION = '0.4.2';
 const DEFAULT_OAUTH_CODE_TIMEOUT_MS = 60_000;
 const OAUTH_CODE_TIMEOUT_MS = parseOAuthTimeout(
   process.env.MCPORTER_OAUTH_TIMEOUT_MS ?? process.env.MCPORTER_OAUTH_TIMEOUT
 );
 export const MCPORTER_VERSION = CLIENT_VERSION;
+
+// isCraftUrl checks if a URL belongs to a Craft MCP server (craft.do or luki.io domains).
+function isCraftUrl(url: URL): boolean {
+  return url.hostname.endsWith('.craft.do') || url.hostname.endsWith('.luki.io');
+}
 
 function parseOAuthTimeout(raw: string | undefined): number {
   if (!raw) {
@@ -349,6 +354,11 @@ class McpRuntime implements Runtime {
           }
           if (primaryError instanceof OAuthTimeoutError) {
             await oauthSession?.close().catch(() => {});
+            throw primaryError;
+          }
+          // Craft connections only support streamable HTTP, not SSE.
+          // Skip SSE fallback for Craft URLs and throw the original error.
+          if (isCraftUrl(command.url)) {
             throw primaryError;
           }
           if (primaryError instanceof Error) {

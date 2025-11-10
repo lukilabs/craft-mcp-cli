@@ -68,7 +68,7 @@ describe('craft runtime', () => {
       mocks.mockGetConnection.mockResolvedValue(testConnection);
       const { createRuntime } = await import('../src/runtime.js');
 
-      const runtime = await createCraftRuntime('work');
+      const _runtime = await createCraftRuntime('work');
 
       expect(mocks.mockGetConnection).toHaveBeenCalledWith('work');
       expect(mocks.mockValidateCraftUrl).toHaveBeenCalledWith(testConnection.url);

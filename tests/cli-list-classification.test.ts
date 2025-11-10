@@ -60,9 +60,9 @@ describe('CLI list classification and routing', () => {
     await handleList(runtime, []);
 
     const logLines = logSpy.mock.calls.map((call) => call.join(' '));
-    expect(
-      logLines.some((line) => line.includes("vercel — Vercel MCP (auth required — run 'craft auth vercel'"))
-    ).toBe(true);
+    expect(logLines.some((line) => line.includes("vercel — Vercel MCP (auth required — run 'craft auth vercel'"))).toBe(
+      true
+    );
     expect(logLines.some((line) => line.includes("github (auth required — run 'craft auth github'"))).toBe(true);
     const nextDevtoolsLineFound = logLines.some(
       (line) => line.startsWith('- next-devtools') && line.includes('offline — unable to reach server')

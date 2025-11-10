@@ -24,6 +24,37 @@ Or use without installing:
 npx craft-mcp-cli list
 ```
 
+### Local Development
+
+To use the `craft` command locally during development:
+
+1. Build the project:
+
+```bash
+pnpm build
+```
+
+2. Link the package globally:
+
+```bash
+npm link
+```
+
+Now you can use `craft` commands directly:
+
+```bash
+craft list
+craft add work https://mcp.craft.do/links/XXX/mcp
+```
+
+**Note:** After making changes, rebuild with `pnpm build` for them to take effect in the global `craft` command.
+
+To unlink later:
+
+```bash
+npm unlink -g craft-mcp-cli
+```
+
 ## Quick Start
 
 ### 1. Add a Craft connection
@@ -211,16 +242,6 @@ Common tools available (varies by connection type):
 - Plus all document tools
 
 Use `craft tools` to see all available tools for your connection.
-
-## Migration from mcporter
-
-This package is a Craft-specific fork of [mcporter](https://github.com/steipete/mcporter). It maintains backward compatibility:
-
-- The `mcporter` binary alias still works
-- `config/craft.json` replaces `config/mcporter.json`
-- Generic MCP functionality is still available via the `mcporter` command
-
-For generic MCP use cases, use the original mcporter package.
 
 ## License
 

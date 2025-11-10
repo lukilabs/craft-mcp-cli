@@ -87,7 +87,7 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     this.redirectUrlValue = redirectUrl;
     this.logger = logger;
     this.metadata = {
-      client_name: definition.clientName ?? `mcporter (${definition.name})`,
+      client_name: definition.clientName ?? `Craft CLI (${definition.name})`,
       redirect_uris: [this.redirectUrlValue.toString()],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
@@ -103,7 +103,7 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     provider: FileOAuthClientProvider;
     close: () => Promise<void>;
   }> {
-    const tokenDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.mcporter', definition.name);
+    const tokenDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.craft', definition.name);
     await ensureDirectory(tokenDir);
 
     const server = http.createServer();

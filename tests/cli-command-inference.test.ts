@@ -162,7 +162,9 @@ describe('command inference', () => {
       // The Craft fallback only happens when resolution is null or definitions.length === 0
       // Since 'unknown_tool' doesn't match any server, it will abort
       expect(result.kind).toBe('abort');
-      expect(result.exitCode).toBe(1);
+      if (result.kind === 'abort') {
+        expect(result.exitCode).toBe(1);
+      }
 
       errorSpy.mockRestore();
     });

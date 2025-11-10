@@ -20,7 +20,7 @@ describe('loadServerDefinitions', () => {
     expect(signoz?.command.kind).toBe('stdio');
     expect(signoz?.env?.SIGNOZ_URL).toBe(`\${SIGNOZ_URL:-http://localhost:3301}`);
     const vercel = servers.find((server) => server.name === 'vercel');
-    expect(vercel?.tokenCacheDir).toBe(path.join(os.homedir(), '.mcporter', 'vercel'));
+    expect(vercel?.tokenCacheDir).toBe(path.join(os.homedir(), '.craft', 'vercel'));
   });
 
   it('resolves HTTP headers with environment placeholders', async () => {

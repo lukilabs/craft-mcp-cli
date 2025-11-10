@@ -57,9 +57,9 @@ export { validateCraftUrl } from './craft-validation.js';
 // Generic Runtime (for generate-cli)
 // ============================================================================
 
-export { createRuntime, callOnce } from './runtime.js';
+export { createCallResult, wrapCallResult } from './result-utils.js';
+export { callOnce, createRuntime } from './runtime.js';
 export { createServerProxy } from './server-proxy.js';
-export { wrapCallResult, createCallResult } from './result-utils.js';
 
 // ============================================================================
 // Types
@@ -71,5 +71,5 @@ export type {
   CraftConnectionType,
 } from './craft-config.js';
 
-export type { Runtime, RuntimeOptions, CallOptions } from './runtime.js';
 export type { CallResult } from './result-utils.js';
+export type { CallOptions, Runtime, RuntimeOptions } from './runtime.js';

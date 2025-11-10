@@ -139,9 +139,7 @@ describe('craft config', () => {
 
   describe('addConnection', () => {
     it('adds connection and sets as default if first', async () => {
-      mocks.mockListTools.mockResolvedValue([
-        { name: 'test_tool', description: 'Test' },
-      ]);
+      mocks.mockListTools.mockResolvedValue([{ name: 'test_tool', description: 'Test' }]);
 
       await addConnection('work', 'https://mcp.craft.do/links/SECRET/mcp', 'Work docs');
 
@@ -166,9 +164,7 @@ describe('craft config', () => {
     });
 
     it('auto-discovers type as doc when connection_time_get is not present', async () => {
-      mocks.mockListTools.mockResolvedValue([
-        { name: 'collections_list', description: 'List collections' },
-      ]);
+      mocks.mockListTools.mockResolvedValue([{ name: 'collections_list', description: 'List collections' }]);
 
       await addConnection('doc', 'https://mcp.craft.do/links/SECRET/mcp');
 
@@ -198,6 +194,25 @@ describe('craft config', () => {
       const config = await loadCraftConfig();
       expect(config.connections[0]?.type).toBeUndefined();
       expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not auto-discover'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Could not auto-detect type'));
+    });
+
+    it('handles auth errors during discovery gracefully', async () => {
+      mocks.mockListTools.mockRejectedValue(new Error('SSE error: Non-200 status code (401)'));
+
+      await addConnection('auth-required', 'https://mcp.craft.do/links/SECRET/mcp');
+
+      const config = await loadCraftConfig();
+      expect(config.connections[0]?.type).toBeUndefined();
+      // Should not log a warning for auth errors
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(expect.stringContaining('Could not auto-discover'));
+      // Should show helpful message about authentication
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Could not auto-detect type (authentication required)')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("You can authenticate later with 'craft auth auth-required'")
+      );
     });
 
     it('does not set as default if not first connection', async () => {

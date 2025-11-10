@@ -15,7 +15,7 @@ export function maybeEnableOAuth(definition: ServerDefinition, logger: Logger): 
   if (!isAdHocSource) {
     return undefined;
   }
-  const tokenCacheDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.mcporter', definition.name);
+  const tokenCacheDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.craft', definition.name);
   logger.info(`Detected OAuth requirement for '${definition.name}'. Launching browser flow...`);
   return {
     ...definition,

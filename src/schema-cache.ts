@@ -12,7 +12,7 @@ export interface SchemaCacheSnapshot {
 
 // resolveSchemaCacheDir determines where schemas should be cached for a server.
 export function resolveSchemaCacheDir(definition: ServerDefinition): string {
-  return definition.tokenCacheDir ?? path.join(os.homedir(), '.mcporter', definition.name);
+  return definition.tokenCacheDir ?? path.join(os.homedir(), '.craft', definition.name);
 }
 
 // resolveSchemaCachePath builds the schema cache file path for a server definition.
