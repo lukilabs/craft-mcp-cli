@@ -6,6 +6,28 @@ All notable changes to Craft MCP CLI will be documented in this file.
 
 _No changes yet._
 
+## [1.0.2] - 2025-11-10
+
+### Fixed
+
+- **Shell completion performance**: Implemented per-connection caching to eliminate 5+ second delays
+  - Cache directory at `/tmp/craft-completion-cache-$USER/` with separate files per connection
+  - Tool completions now instant after first use
+  - Cache automatically invalidated when connections are added/removed
+
+- **Argument input handling**: Fixed completion blocking argument entry
+  - Tool completion only shows at position 2 after connection name
+  - After selecting a tool, completion stops to allow argument typing
+  - Example: `craft space blocks_add <tab>` now allows argument input instead of showing tools again
+
+- **Tool name display**: Removed erroneous `:tool` suffix
+  - Tools now display cleanly: `blocks_add`, `collections_list` instead of `blocks_addool`, `collections_listool`
+
+### Changed
+
+- Shell completion cache structure changed from single file to directory with per-connection files
+- Completion priming now caches both default and connection-specific tool lists
+
 ## [1.0.1] - 2025-11-10
 
 ### Fixed
