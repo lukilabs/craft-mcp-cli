@@ -290,17 +290,28 @@ class McpRuntime implements Runtime {
       }
 
       // HTTP transports may need to retry once OAuth is auto-enabled.
+      // Track OAuth session across retries to avoid port conflicts
+      let existingOAuthSession: OAuthSession | undefined;
       while (true) {
         const command = activeDefinition.command;
         if (command.kind !== 'http') {
           throw new Error(`Server '${activeDefinition.name}' is not configured for HTTP transport.`);
         }
-        let oauthSession: OAuthSession | undefined;
-        // Always create OAuth session when auth is configured, even with maxOAuthAttempts: 0
-        // This ensures we can use cached tokens without opening browser
-        const shouldEstablishOAuth = activeDefinition.auth === 'oauth';
-        if (shouldEstablishOAuth) {
-          oauthSession = await createOAuthSession(activeDefinition, this.logger);
+        // Reuse OAuth session across retries to avoid port conflicts
+        let oauthSession: OAuthSession | undefined = existingOAuthSession;
+
+        // Create OAuth session if we don't have one yet and:
+        // 1. auth is explicitly 'oauth', OR
+        // 2. It's a Craft URL (always create to use cached tokens if available)
+        // We always create sessions for Craft URLs to load cached tokens,
+        // but only trigger interactive auth flow when maxOAuthAttempts !== 0.
+        if (!oauthSession) {
+          const isCraftConnection = isCraftUrl(command.url);
+          const shouldEstablishOAuth = activeDefinition.auth === 'oauth' || isCraftConnection;
+          if (shouldEstablishOAuth) {
+            oauthSession = await createOAuthSession(activeDefinition, this.logger);
+            existingOAuthSession = oauthSession; // Save for next retry
+          }
         }
 
         const resolvedHeaders = materializeHeaders(command.headers, activeDefinition.name);
@@ -309,6 +320,9 @@ class McpRuntime implements Runtime {
           ? { headers: resolvedHeaders as HeadersInit }
           : undefined;
 
+        // Always pass authProvider if we have an OAuth session
+        // This allows the SDK to use cached tokens during discovery
+        // Interactive auth flow is controlled by maxOAuthAttempts in connectWithAuth
         const baseOptions = {
           requestInit,
           authProvider: oauthSession?.provider,
@@ -317,12 +331,19 @@ class McpRuntime implements Runtime {
         const attemptConnect = async () => {
           const streamableTransport = new StreamableHTTPClientTransport(command.url, baseOptions);
           try {
-            await this.connectWithAuth(client, streamableTransport, oauthSession, activeDefinition.name);
+            const finalSession = await this.connectWithAuth(
+              client,
+              streamableTransport,
+              oauthSession,
+              activeDefinition.name,
+              activeDefinition,
+              options.maxOAuthAttempts
+            );
             return {
               client,
               transport: streamableTransport,
               definition: activeDefinition,
-              oauthSession,
+              oauthSession: finalSession,
             } as ClientContext;
           } catch (error) {
             await closeTransportAndWait(this.logger, streamableTransport).catch(() => {});
@@ -333,6 +354,11 @@ class McpRuntime implements Runtime {
         try {
           return await attemptConnect();
         } catch (primaryError) {
+          // If OAuth tokens were just refreshed, retry the connection with fresh tokens
+          if (primaryError instanceof OAuthTokensRefreshedError) {
+            continue;
+          }
+
           if (isUnauthorizedError(primaryError)) {
             const promoted = maybeEnableOAuth(activeDefinition, this.logger);
             if (promoted && options.maxOAuthAttempts !== 0) {
@@ -362,8 +388,15 @@ class McpRuntime implements Runtime {
             ...baseOptions,
           });
           try {
-            await this.connectWithAuth(client, sseTransport, oauthSession, activeDefinition.name);
-            return { client, transport: sseTransport, definition: activeDefinition, oauthSession };
+            const finalSession = await this.connectWithAuth(
+              client,
+              sseTransport,
+              oauthSession,
+              activeDefinition.name,
+              activeDefinition,
+              options.maxOAuthAttempts
+            );
+            return { client, transport: sseTransport, definition: activeDefinition, oauthSession: finalSession };
           } catch (sseError) {
             await closeTransportAndWait(this.logger, sseTransport).catch(() => {});
             await oauthSession?.close().catch(() => {});
@@ -392,12 +425,78 @@ class McpRuntime implements Runtime {
       close(): Promise<void>;
       finishAuth?: (authorizationCode: string) => Promise<void>;
     },
-    _session?: OAuthSession,
-    _serverName?: string
-  ): Promise<void> {
-    // Simply connect - if OAuth is configured, the authProvider will handle the flow automatically
-    // through the transport's internal retry mechanism
-    await client.connect(transport);
+    session: OAuthSession | undefined,
+    serverName: string | undefined,
+    definition: ServerDefinition,
+    maxOAuthAttempts: number | undefined
+  ): Promise<OAuthSession | undefined> {
+    try {
+      // Try to connect - if OAuth is needed and we have cached tokens, they'll be used automatically
+      await client.connect(transport);
+      return session;
+    } catch (error) {
+      // If we got an authorization error, we need OAuth
+      if (isUnauthorizedError(error) && transport.finishAuth && maxOAuthAttempts !== 0) {
+        const name = serverName ? `server '${serverName}'` : 'server';
+
+        // Create OAuth session on-demand if we don't have one yet
+        let oauthSession: OAuthSession;
+        if (!session) {
+          this.logger.info(`Creating OAuth session on-demand for ${name}...`);
+          oauthSession = await createOAuthSession(definition, this.logger);
+        } else {
+          oauthSession = session;
+        }
+
+        // The SDK tried to use cached tokens that are now invalid
+        // We need to clear them and start a fresh OAuth flow
+        if ('invalidateCredentials' in oauthSession.provider) {
+          await (
+            oauthSession.provider as { invalidateCredentials: (scope: 'all' | 'tokens' | 'client' | 'verifier') => Promise<void> }
+          ).invalidateCredentials('all');
+        }
+
+        // Close only the transport (not the client - we'll reconnect it)
+        await transport.close().catch(() => {});
+
+        // Create a new transport with the OAuth provider (credentials already invalidated)
+        const command = definition.command;
+        if (command.kind !== 'http') {
+          throw new Error('Expected HTTP command');
+        }
+        const newTransport = new StreamableHTTPClientTransport(command.url, {
+          authProvider: oauthSession.provider,
+        }) as typeof transport;
+
+        // Connect with the new transport - this will trigger OAuth flow
+        try {
+          await client.connect(newTransport);
+          return oauthSession;
+        } catch (retryError) {
+          // OAuth was triggered but user needs to complete it
+          if (isUnauthorizedError(retryError) && newTransport.finishAuth) {
+            const authorizationCode = await oauthSession.waitForAuthorizationCode();
+
+            await newTransport.finishAuth(authorizationCode);
+
+            // After finishAuth(), the tokens are saved to disk
+            // Throw a special error to signal the runtime to retry the entire connection
+            // from scratch with the new tokens
+            throw new OAuthTokensRefreshedError('OAuth tokens refreshed, retry connection');
+          }
+          throw retryError;
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+class OAuthTokensRefreshedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OAuthTokensRefreshedError';
   }
 }
 
