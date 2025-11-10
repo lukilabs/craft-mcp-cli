@@ -324,9 +324,8 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     openExternal(authorizationUrl.toString());
     this.logger.info(`If the browser did not open, visit ${authorizationUrl.toString()} manually.`);
 
-    // Wait for the authorization code from the browser callback
-    // This blocks until the user completes the OAuth flow
-    await this.authorizationDeferred.promise;
+    // Don't wait here - the callback will resolve authorizationDeferred when the user completes OAuth
+    // Callers should use waitForAuthorizationCode() to wait for the authorization code
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
@@ -374,15 +373,27 @@ class FileOAuthClientProvider implements OAuthClientProvider {
   // close stops the temporary callback server created for the OAuth session.
   async close(): Promise<void> {
     if (this.authorizationDeferred) {
-      // If the CLI is tearing down mid-flow, reject the pending wait promise so runtime shutdown isn't blocked.
-      this.authorizationDeferred.reject(new Error('OAuth session closed before receiving authorization code.'));
+      // If the CLI is tearing down mid-flow, silently resolve the pending promise
+      // Don't reject - that could cause unhandled errors during cleanup
       this.authorizationDeferred = null;
     }
     if (!this.server) {
       return;
     }
+
+    // Close the HTTP server with a timeout to prevent hanging
     await new Promise<void>((resolve) => {
-      this.server?.close(() => resolve());
+      const timeout = setTimeout(() => {
+        resolve();
+      }, 2000);
+
+      this.server?.close((err) => {
+        clearTimeout(timeout);
+        if (err) {
+          this.logger.warn(`Error closing OAuth callback server: ${err.message}`);
+        }
+        resolve();
+      });
     });
     this.server = undefined;
   }

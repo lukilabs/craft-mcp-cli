@@ -4,6 +4,8 @@ _Command-line interface and SDK for Craft documents via Model Context Protocol._
 
 Craft MCP CLI provides a simple, focused CLI for working with your Craft documents through MCP (Model Context Protocol). Manage multiple Craft connections, call tools directly from the command line, and build automations with the TypeScript SDK.
 
+This project is a fork of [mcporter](https://github.com/modelcontextprotocol/mcporter), a general-purpose MCP CLI tool, specifically tailored for Craft's Document and Daily Notes MCP Servers via the Model Context Protocol.
+
 ## Key Features
 
 - **Simple connection management** - Add, list, and switch between multiple Craft document connections
@@ -219,6 +221,26 @@ echo '{"id":"abc"}' | craft blocks_get --args -
 craft blocks_update --edit
 ```
 
+The `--edit` flag opens an interactive editor to compose tool arguments:
+
+- **Auto-generated template**: Creates a JSON template from the tool's input schema with helpful comments
+- **Editor selection**: Uses `$EDITOR`, `$VISUAL`, or defaults to `nano`
+- **GUI editor support**: Automatically adds `--wait` for VS Code, Sublime, Atom, and TextMate
+- **Schema requirement**: Only works for tools that expose an input schema
+- **Comment support**: You can add `//` comments in the JSON template for notes (they're removed before parsing)
+
+Example workflow:
+
+```bash
+craft blocks_update --edit
+# Opens editor with pre-filled template:
+# {
+#   "id": "",  // Block ID (required)
+#   "content": {}  // Block content object (required)
+# }
+# Edit and save, then the tool is called with your arguments
+```
+
 ### Debug Logging
 
 ```bash
@@ -228,20 +250,91 @@ craft collections_list --json       # Output raw JSON
 
 ## Craft MCP Tools
 
-Common tools available (varies by connection type):
+```bash
+craft tools               # List tools for default connection
+craft tools <connection>  # List tools for specified connection
+```
 
-**Document connections:**
-- `collections_list` - List collections in the document
-- `collections_create` - Create a new collection
-- `collectionSchema_get` - Get collection schema
-- `blocks_get` - Get block content
-- `blocks_update` - Update block content
+## Minting: Generate Types, CLI, and SDK
 
-**Daily-notes connections:**
-- `connection_time_get` - Get current connection time
-- Plus all document tools
+"Minting" lets you generate TypeScript types, standalone CLIs, and SDK clients from your Craft connections. This is perfect for building type-safe automations, creating custom CLIs, or embedding Craft functionality in your projects.
 
-Use `craft tools` to see all available tools for your connection.
+### Generate TypeScript Types and Clients
+
+Use `craft emit-ts` to generate TypeScript definitions and typed client helpers:
+
+```bash
+# Generate types-only (interface definitions)
+craft emit-ts work --out types/work-tools.d.ts
+
+# Generate full client with runtime helpers
+craft emit-ts work --mode client --out clients/work.ts
+```
+
+**Types mode** (`--mode types`, default):
+
+- Generates a `.d.ts` file with TypeScript interfaces
+- Includes doc comments and parameter hints
+- Perfect for type-checking existing code
+
+**Client mode** (`--mode client`):
+
+- Generates both `.ts` and `.d.ts` files
+- Includes a `createWorkClient()` factory function
+- Wraps `createServerProxy` with proper types
+- Handles runtime creation and cleanup
+
+Example generated client usage:
+
+```typescript
+import { createWorkClient } from './clients/work.js';
+
+const client = await createWorkClient();
+const collections = await client.collections_list();
+console.log(collections.text());
+await client.close();
+```
+
+### Generate Standalone CLIs
+
+Use `craft generate-cli` to create standalone CLI tools for a specific connection:
+
+```bash
+# Generate TypeScript CLI
+craft generate-cli work --output cli/work.ts
+
+# Bundle into a single JavaScript file
+craft generate-cli work --bundle dist/work.js
+
+# Compile to a native binary (Bun only)
+craft generate-cli work --compile dist/work
+```
+
+**Features:**
+
+- **Schema-aware**: Automatically maps tool arguments to CLI flags
+- **Self-contained**: Embeds connection configuration
+- **Multiple formats**: TypeScript, bundled JS, or compiled binary
+- **Regeneration**: Use `craft inspect-cli <artifact>` to see metadata and regenerate
+
+**Example generated CLI:**
+
+```bash
+# After generating: craft generate-cli work --bundle dist/work.js
+chmod +x dist/work.js
+./dist/work.js collections_list
+./dist/work.js blocks_get --id abc123
+```
+
+### Inspect Generated Artifacts
+
+```bash
+# View metadata and regeneration command
+craft inspect-cli dist/work.js
+
+# Regenerate from artifact
+craft generate-cli --from dist/work.js
+```
 
 ## License
 
@@ -249,4 +342,4 @@ MIT
 
 ## Contributing
 
-Issues and pull requests welcome at [github.com/your-repo/craft-mcp-cli](https://github.com/your-repo/craft-mcp-cli)
+Issues and pull requests welcome at [github.com/lukilabs/craft-mcp-cli](https://github.com/your-repo/craft-mcp-cli)

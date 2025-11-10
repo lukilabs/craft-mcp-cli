@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Build a self-contained mcporter binary using Bun's --compile mode.
+ * Build a self-contained craft binary using Bun's --compile mode.
  * Mirrors the poltergeist release flow so we can dual-publish via npm + Homebrew.
  */
 
@@ -57,7 +57,7 @@ function requireValue(flag: string, value: string | undefined): string {
   return value;
 }
 
-// main orchestrates the Bun compile flow for the mcporter binary.
+// main orchestrates the Bun compile flow for the craft binary.
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const projectRoot = path.join(fs.realpathSync(path.dirname(new URL(import.meta.url).pathname)), '..');
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
   const outputPath = options.output
     ? path.resolve(options.output)
-    : path.join(distDir, options.target ? `mcporter-${options.target}` : 'mcporter');
+    : path.join(distDir, options.target ? `craft-${options.target}` : 'craft');
 
   const buildArgs = ['build', path.join(projectRoot, 'src/cli.ts'), '--compile', '--outfile', outputPath];
 
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     buildArgs.push('--target', options.target);
   }
 
-  console.log(`Building mcporter binary → ${outputPath}`);
+  console.log(`Building craft binary → ${outputPath}`);
   const result = spawnSync('bun', buildArgs, { stdio: 'inherit' });
   if (result.status !== 0) {
     throw new Error(`bun build exited with status ${result.status ?? 'unknown'}`);
@@ -115,7 +115,7 @@ function formatSize(bytes: number): string {
 }
 
 main().catch((error) => {
-  console.error('mcporter Bun build failed.');
+  console.error('craft Bun build failed.');
   if (error instanceof Error) {
     console.error(error.message);
   } else {

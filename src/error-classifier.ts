@@ -120,7 +120,10 @@ function containsAuthToken(normalizedMessage: string): boolean {
     normalizedMessage.includes('401') ||
     normalizedMessage.includes('unauthorized') ||
     normalizedMessage.includes('invalid_token') ||
-    normalizedMessage.includes('forbidden')
+    normalizedMessage.includes('forbidden') ||
+    normalizedMessage.includes('"error":"server_error"') ||
+    normalizedMessage.includes('"error":"invalid_token"') ||
+    normalizedMessage.includes('"error":"invalid_grant"')
   );
 }
 

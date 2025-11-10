@@ -67,6 +67,36 @@ echo '{"id":"abc123"}' | craft blocks_get --args -
 - Use `--args @file.json` to read arguments from a file.
 - Use `--args -` to read from stdin.
 
+## 6. Interactive Editor Mode
+
+```bash
+craft blocks_update --edit
+craft work blocks_get --edit
+```
+
+The `--edit` flag opens an interactive editor to compose tool arguments:
+
+- **Auto-generated template**: Creates a JSON template from the tool's input schema with helpful comments for each field
+- **Editor selection**: Uses `$EDITOR`, `$VISUAL`, or defaults to `nano`
+- **GUI editor support**: Automatically adds `--wait` flag for VS Code (`code`), Sublime (`subl`), Atom (`atom`), and TextMate (`mate`)
+- **Schema requirement**: Only works for tools that expose an input schema (throws an error if the tool doesn't have one)
+- **Comment support**: You can add `//` comments in the JSON template for notes—they're automatically removed before parsing
+
+Example:
+```bash
+craft blocks_update --edit
+```
+
+Opens your editor with a pre-filled template like:
+```json
+{
+  "id": "",  // Block ID (required)
+  "content": {}  // Block content object (required)
+}
+```
+
+After editing and saving, the tool is called with your arguments. If the editor exits with a non-zero code or the JSON is invalid, the command fails with an error.
+
 ---
 
 **Tips**
@@ -74,3 +104,4 @@ echo '{"id":"abc123"}' | craft blocks_get --args -
 - Use `craft tools [connection]` to see detailed tool signatures.
 - Use `craft use <name>` to set the default connection.
 - OAuth authentication: `craft auth <name|url>` when needed.
+- Use `--edit` for complex nested JSON arguments that are easier to edit in a full editor than on the command line.

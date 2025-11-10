@@ -644,9 +644,9 @@ export async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntim
   // server gets auto-promoted to OAuth mid-flight.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      logInfo(`Initiating OAuth flow for '${target}'...`);
       const tools = await runtime.listTools(target, { autoAuthorize: true });
-      logInfo(`Authorization complete. ${tools.length} tool${tools.length === 1 ? '' : 's'} available.`);
+      // Use console.log to ensure the success message is always visible
+      console.log(`✓ Authorization complete. ${tools.length} tool${tools.length === 1 ? '' : 's'} available.`);
       return;
     } catch (error) {
       if (attempt === 0 && shouldRetryAuthError(error)) {

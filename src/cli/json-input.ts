@@ -51,14 +51,21 @@ export async function parseJsonValue(value: string | undefined): Promise<unknown
 
 /**
  * Open an editor for the user to input tool arguments
- * Generates a template from the tool schema with helpful comments
+ * Generates a template from the tool schema with JSON schema validation support
  */
 export async function openEditorForArgs(toolSchema: ServerToolInfo): Promise<Record<string, unknown>> {
-  const template = generateTemplateFromSchema(toolSchema.inputSchema);
-
   const tmpDir = path.join(os.tmpdir(), 'craft-cli');
   await fs.mkdir(tmpDir, { recursive: true });
-  const tmpFile = path.join(tmpDir, `craft-${toolSchema.name}-${Date.now()}.json`);
+
+  const timestamp = Date.now();
+  const tmpFile = path.join(tmpDir, `craft-${toolSchema.name}-${timestamp}.json`);
+  const schemaFile = path.join(tmpDir, `craft-${toolSchema.name}-${timestamp}.schema.json`);
+
+  // Write the schema file for editor validation support
+  await fs.writeFile(schemaFile, JSON.stringify(toolSchema.inputSchema, null, 2), 'utf-8');
+
+  // Generate template with $schema reference
+  const template = generateTemplateFromSchema(toolSchema.inputSchema, schemaFile);
 
   await fs.writeFile(tmpFile, template, 'utf-8');
 
@@ -84,22 +91,26 @@ export async function openEditorForArgs(toolSchema: ServerToolInfo): Promise<Rec
       try {
         const content = await fs.readFile(tmpFile, 'utf-8');
         await fs.unlink(tmpFile).catch(() => {});
+        await fs.unlink(schemaFile).catch(() => {});
 
-        // Remove comments (lines starting with //)
-        const jsonContent = content
-          .split('\n')
-          .filter((line) => !line.trim().startsWith('//'))
-          .join('\n');
+        const parsed = JSON.parse(content);
 
-        resolve(JSON.parse(jsonContent));
+        // Remove $schema property if present (it was just for editor support)
+        if (parsed && typeof parsed === 'object' && '$schema' in parsed) {
+          delete parsed.$schema;
+        }
+
+        resolve(parsed);
       } catch (error) {
         await fs.unlink(tmpFile).catch(() => {});
+        await fs.unlink(schemaFile).catch(() => {});
         reject(error);
       }
     });
 
     child.on('error', async (error) => {
       await fs.unlink(tmpFile).catch(() => {});
+      await fs.unlink(schemaFile).catch(() => {});
       reject(error);
     });
   });
@@ -107,9 +118,9 @@ export async function openEditorForArgs(toolSchema: ServerToolInfo): Promise<Rec
 
 /**
  * Generate a JSON template from a JSON schema
- * Includes helpful comments for each property
+ * Optionally includes a $schema reference for editor validation support
  */
-export function generateTemplateFromSchema(schema: unknown): string {
+export function generateTemplateFromSchema(schema: unknown, schemaFile?: string): string {
   if (!schema || typeof schema !== 'object') {
     return '{}';
   }
@@ -124,6 +135,13 @@ export function generateTemplateFromSchema(schema: unknown): string {
   const required = schemaObj.required || [];
 
   const lines: string[] = ['{'];
+
+  // Add $schema reference for editor validation support
+  if (schemaFile) {
+    lines.push(`  "$schema": "file://${schemaFile}",`);
+    lines.push('');
+  }
+
   const keys = Object.keys(properties);
 
   for (let i = 0; i < keys.length; i++) {
@@ -139,16 +157,7 @@ export function generateTemplateFromSchema(schema: unknown): string {
       properties?: unknown;
       default?: unknown;
     };
-    const isRequired = required.includes(key);
-    const desc = prop?.description || '';
     const isLastKey = i === keys.length - 1;
-
-    // Add comment
-    if (desc) {
-      lines.push(`  // ${isRequired ? 'REQUIRED' : 'OPTIONAL'}: ${desc}`);
-    } else {
-      lines.push(`  // ${isRequired ? 'REQUIRED' : 'OPTIONAL'}`);
-    }
 
     // Add property with example value
     const example = generateExampleValue(prop);
@@ -162,10 +171,6 @@ export function generateTemplateFromSchema(schema: unknown): string {
 
     const comma = isLastKey ? '' : ',';
     lines.push(`  "${key}": ${indentedExample}${comma}`);
-
-    if (!isLastKey) {
-      lines.push('');
-    }
   }
 
   lines.push('}');

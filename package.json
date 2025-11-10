@@ -19,10 +19,19 @@
   "bin": {
     "craft": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "craft": "tsx src/cli.ts",
+    "generate:version": "tsx scripts/generate-version.ts",
+    "prebuild": "pnpm generate:version",
     "build": "tsc -p tsconfig.build.json",
-    "build:bun": "bun scripts/build-bun.ts",
+    "build:bun": "pnpm generate:version && bun scripts/build-bun.ts",
+    "build:bun:all": "pnpm generate:version && bun scripts/build-all-targets.ts",
     "check": "pnpm lint:biome && pnpm lint:oxlint && pnpm typecheck",
     "lint": "pnpm check",
     "lint:biome": "biome check",

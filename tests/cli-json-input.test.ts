@@ -145,10 +145,10 @@ describe('json input parsing', () => {
       };
 
       const template = generateTemplateFromSchema(schema);
-      expect(template).toContain('// REQUIRED: A required field');
-      expect(template).toContain('// OPTIONAL: An optional field');
       expect(template).toContain('"requiredField"');
       expect(template).toContain('"optionalField"');
+      expect(template).toContain('""'); // empty string for requiredField
+      expect(template).toContain('0'); // zero for optionalField
     });
 
     it('generates template with default values', () => {
@@ -240,20 +240,33 @@ describe('json input parsing', () => {
       expect(template).toContain('null'); // null
     });
 
-    it('handles properties without descriptions', () => {
+    it('includes $schema reference when schema file is provided', () => {
       const schema = {
         type: 'object',
         properties: {
-          noDesc: {
+          field: {
             type: 'string',
           },
         },
-        required: ['noDesc'],
+      };
+
+      const schemaFilePath = '/tmp/test-schema.json';
+      const template = generateTemplateFromSchema(schema, schemaFilePath);
+      expect(template).toContain(`"$schema": "file://${schemaFilePath}"`);
+    });
+
+    it('does not include $schema when schema file is not provided', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          field: {
+            type: 'string',
+          },
+        },
       };
 
       const template = generateTemplateFromSchema(schema);
-      expect(template).toContain('// REQUIRED');
-      expect(template).not.toContain('// REQUIRED:');
+      expect(template).not.toContain('$schema');
     });
   });
 
@@ -317,9 +330,8 @@ describe('json input parsing', () => {
       const mockWriteFile = vi.spyOn(fs, 'writeFile');
       const mockUnlink = vi.spyOn(fs, 'unlink');
 
-      // Simulate file content with comments
+      // Simulate file content
       const fileContent = `{
-  // REQUIRED: First argument
   "arg1": "test-value"
 }`;
 
@@ -327,16 +339,22 @@ describe('json input parsing', () => {
 
       const result = await openEditorForArgs(toolSchema);
 
-      expect(spawn).toHaveBeenCalledWith('nano', expect.arrayContaining([expect.any(String)]), {
-        stdio: 'inherit',
-      });
-      expect(mockWriteFile).toHaveBeenCalled();
+      expect(spawn).toHaveBeenCalledWith(
+        'nano',
+        expect.arrayContaining([expect.any(String)]),
+        expect.objectContaining({
+          stdio: 'inherit',
+        })
+      );
+      // Should write both the JSON template and the schema file
+      expect(mockWriteFile).toHaveBeenCalledTimes(2);
       expect(mockReadFile).toHaveBeenCalled();
-      expect(mockUnlink).toHaveBeenCalled();
+      // Should clean up both the JSON file and the schema file
+      expect(mockUnlink).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ arg1: 'test-value' });
     });
 
-    it('strips comments from file content', async () => {
+    it('parses clean JSON from file', async () => {
       const toolSchema: ServerToolInfo = {
         name: 'test_tool',
         description: 'Test tool',
@@ -360,9 +378,7 @@ describe('json input parsing', () => {
 
       const mockReadFile = vi.spyOn(fs, 'readFile');
       const fileContent = `{
-  // This is a comment
   "arg1": "value"
-  // Another comment
 }`;
 
       mockReadFile.mockResolvedValue(fileContent);
@@ -497,6 +513,43 @@ describe('json input parsing', () => {
       vi.spyOn(fs, 'readFile').mockResolvedValue('invalid json');
 
       await expect(openEditorForArgs(toolSchema)).rejects.toThrow();
+    });
+
+    it('removes $schema property from result', async () => {
+      const toolSchema: ServerToolInfo = {
+        name: 'test_tool',
+        description: 'Test tool',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            arg1: { type: 'string' },
+          },
+        },
+      };
+
+      const mockChild = {
+        on: vi.fn((event: string, callback: (code: number) => void) => {
+          if (event === 'exit') {
+            setTimeout(() => callback(0), 10);
+          }
+        }),
+      };
+
+      vi.mocked(spawn).mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
+
+      // Simulate user leaving the $schema property in the file
+      const fileContent = `{
+  "$schema": "file:///tmp/schema.json",
+  "arg1": "value"
+}`;
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(fileContent);
+
+      const result = await openEditorForArgs(toolSchema);
+
+      // $schema should be removed from the result
+      expect(result).toEqual({ arg1: 'value' });
+      expect(result).not.toHaveProperty('$schema');
     });
   });
 });

@@ -85,15 +85,11 @@ export function formatCallExpressionExample(
     .filter(({ option, literal }) => option.required || literal !== undefined)
     .map(({ option, literal }) => {
       const value = literal ?? buildFallbackLiteral(option);
-      return `${option.property}: ${value}`;
+      return `${option.property}:${value}`;
     });
 
-  const args = assignments.join(', ');
-  const callSuffix = assignments.length > 0 ? `(${args})` : '()';
-  const selector = extra?.callSelector ?? serverName;
-  const expression = `${selector}.${toolName}${callSuffix}`;
-  const rendered = extra?.wrapExpression ? quoteShellExpression(expression) : expression;
-  return `craft call ${rendered}`;
+  const args = assignments.length > 0 ? ` ${assignments.join(' ')}` : '';
+  return `craft ${serverName} ${toolName}${args}`;
 }
 
 export function formatExampleBlock(

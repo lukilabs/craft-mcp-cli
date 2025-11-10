@@ -12,9 +12,10 @@ import { materializeHeaders } from './runtime-header-utils.js';
 import { isUnauthorizedError, maybeEnableOAuth } from './runtime-oauth-support.js';
 import { closeTransportAndWait } from './runtime-process-utils.js';
 import './sdk-patches.js';
+import { VERSION } from './version.js';
 
 const PACKAGE_NAME = 'craft';
-const CLIENT_VERSION = '0.4.2';
+const CLIENT_VERSION = VERSION;
 const DEFAULT_OAUTH_CODE_TIMEOUT_MS = 60_000;
 const OAUTH_CODE_TIMEOUT_MS = parseOAuthTimeout(
   process.env.MCPORTER_OAUTH_TIMEOUT_MS ?? process.env.MCPORTER_OAUTH_TIMEOUT

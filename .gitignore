@@ -19,3 +19,6 @@ coverage
 build
 out
 tmp
+
+# Generated files
+src/version.ts

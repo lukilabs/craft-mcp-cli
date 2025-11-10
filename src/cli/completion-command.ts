@@ -48,15 +48,12 @@ export function getCompletionPath(shell: ShellType): string | null {
     case 'zsh': {
       // Prefer Oh My Zsh cache completions directory (automatically in fpath)
       const ohMyZshCacheCompletions = path.join(home, '.oh-my-zsh', 'cache', 'completions', '_craft');
-      const _ohMyZshCacheDir = path.join(home, '.oh-my-zsh', 'cache', 'completions');
       if (existsSync(path.join(home, '.oh-my-zsh'))) {
         // Oh My Zsh exists, use cache/completions (automatically in fpath)
         return ohMyZshCacheCompletions;
       }
       // Try function-based directory (modern zsh, needs fpath setup)
       const zshFuncDir = path.join(home, '.zsh', 'functions');
-      // Fallback to completions directory
-      const _zshCompletionsDir = path.join(home, '.zsh', 'completions');
       // Return the functions directory (more common)
       return path.join(zshFuncDir, '_craft');
     }
@@ -84,21 +81,25 @@ _craft_completion() {
 
   # Commands
   local commands="add remove use connections tools list call auth generate-cli inspect-cli emit-ts config completions"
-  
+
   # Global flags
   local global_flags="--config --root --log-level --oauth-timeout"
-  
+
   # Command-specific flags
   local list_flags="--json --schema --all-parameters --timeout"
   local call_flags="--json --timeout --tail-log --edit"
   local config_flags="--json"
-  
-  # If completing command name
+
+  # If completing command name (or tool name)
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+    # Get both static commands and tool names
+    local tools
+    tools=$(craft _completion tools 2>/dev/null || echo "")
+    local all_completions="$commands $tools"
+    COMPREPLY=($(compgen -W "$all_completions" -- "$cur"))
     return 0
   fi
-  
+
   # If completing flag
   if [[ "$cur" == -* ]]; then
     local cmd="\${words[1]}"
@@ -118,11 +119,12 @@ _craft_completion() {
     esac
     return 0
   fi
-  
-  # Dynamic completions for connection names
+
+  # Dynamic completions for connection names and tools
   local cmd="\${words[1]}"
   case "$cmd" in
-    use|remove|tools|auth)
+    use|remove|auth)
+      # These commands take connection names only
       if [ $COMP_CWORD -eq 2 ] && [[ "$cur" != -* ]]; then
         local connections
         connections=$(craft _completion connections 2>/dev/null || echo "")
@@ -131,12 +133,30 @@ _craft_completion() {
         fi
       fi
       ;;
-    call|list)
+    tools|list)
+      # These commands take connection names, then show tools
       if [ $COMP_CWORD -eq 2 ] && [[ "$cur" != -* ]]; then
         local connections
         connections=$(craft _completion connections 2>/dev/null || echo "")
         if [ -n "$connections" ]; then
           COMPREPLY=($(compgen -W "$connections" -- "$cur"))
+        fi
+      fi
+      ;;
+    add|remove|use|connections|generate-cli|inspect-cli|emit-ts|config|completions)
+      # Known static commands - don't complete tools after them
+      ;;
+    *)
+      # For unknown first word (could be a connection name), complete with tools
+      if [ $COMP_CWORD -eq 2 ] && [[ "$cur" != -* ]]; then
+        # Check if first word is a connection name
+        local connections
+        connections=$(craft _completion connections 2>/dev/null || echo "")
+        if [[ " $connections " =~ " $cmd " ]]; then
+          # It's a connection, show tools for that connection
+          local tools
+          tools=$(craft _completion tools "$cmd" 2>/dev/null || echo "")
+          COMPREPLY=($(compgen -W "$tools" -- "$cur"))
         fi
       fi
       ;;
@@ -202,7 +222,19 @@ _craft() {
 
   case $state in
     command)
-      _describe 'command' commands
+      # Get tool names for completion alongside commands
+      local tools
+      tools=$(craft _completion tools 2>/dev/null || echo "")
+      if [ -n "$tools" ]; then
+        local -a tool_completions
+        for tool in \${(z)tools}; do
+          tool_completions+=("\$tool:Call tool on default connection")
+        done
+        _describe 'command' commands
+        _describe 'tool' tool_completions
+      else
+        _describe 'command' commands
+      fi
       ;;
     args)
       case $words[1] in
@@ -213,7 +245,7 @@ _craft() {
             '--description[Connection description]' \\
             $global_flags
           ;;
-        remove|use|tools|auth)
+        remove|use|auth)
           local connections
           connections=$(craft _completion connections 2>/dev/null || echo "")
           if [ -n "$connections" ]; then
@@ -224,7 +256,7 @@ _craft() {
             _arguments $global_flags
           fi
           ;;
-        list)
+        tools|list)
           local connections
           connections=$(craft _completion connections 2>/dev/null || echo "")
           if [ -n "$connections" ]; then
@@ -253,8 +285,32 @@ _craft() {
             "1:subcommand:(list get add remove import login logout doctor)" \\
             $global_flags
           ;;
-        *)
+        generate-cli|inspect-cli|emit-ts|connections|completions)
+          # Known static commands - just complete flags
           _arguments $global_flags
+          ;;
+        *)
+          # Check if this is a connection name, if so show tools
+          local connections
+          connections=$(craft _completion connections 2>/dev/null || echo "")
+          if [[ " \${(z)connections} " =~ " $words[1] " ]]; then
+            # It's a connection, show tools for that connection
+            local tools
+            tools=$(craft _completion tools "$words[1]" 2>/dev/null || echo "")
+            if [ -n "$tools" ]; then
+              local -a tool_completions
+              for tool in \${(z)tools}; do
+                tool_completions+=("\$tool")
+              done
+              _arguments \\
+                "1:tool:(\${tool_completions[@]})" \\
+                $global_flags
+            else
+              _arguments $global_flags
+            fi
+          else
+            _arguments $global_flags
+          fi
           ;;
       esac
       ;;
@@ -271,6 +327,36 @@ _craft "$@"
 function generateFishCompletion(): string {
   return `# Fish completion for craft
 
+# Helper functions
+function __fish_craft_connections
+  craft _completion connections 2>/dev/null | tr ' ' '\\n'
+end
+
+function __fish_craft_tools
+  craft _completion tools 2>/dev/null | tr ' ' '\\n'
+end
+
+function __fish_craft_tools_for_connection
+  set -l connection $argv[1]
+  craft _completion tools "$connection" 2>/dev/null | tr ' ' '\\n'
+end
+
+# Check if we're completing a connection-specific tool
+function __fish_craft_is_connection_cmd
+  set -l cmd (commandline -opc)
+  # Check if the first argument after 'craft' is a connection name
+  if test (count $cmd) -ge 2
+    set -l possible_connection $cmd[2]
+    set -l connections (craft _completion connections 2>/dev/null)
+    for conn in $connections
+      if test "$conn" = "$possible_connection"
+        return 0
+      end
+    end
+  end
+  return 1
+end
+
 # Commands
 complete -c craft -f -n '__fish_use_subcommand' -a 'add' -d 'Add a Craft MCP connection'
 complete -c craft -f -n '__fish_use_subcommand' -a 'remove' -d 'Remove a Craft MCP connection'
@@ -285,6 +371,9 @@ complete -c craft -f -n '__fish_use_subcommand' -a 'inspect-cli' -d 'Show metada
 complete -c craft -f -n '__fish_use_subcommand' -a 'emit-ts' -d 'Generate TypeScript client/types for a server'
 complete -c craft -f -n '__fish_use_subcommand' -a 'config' -d 'Inspect or edit config files'
 complete -c craft -f -n '__fish_use_subcommand' -a 'completions' -d 'Install shell completions'
+
+# Tool name completions (for default connection)
+complete -c craft -f -n '__fish_use_subcommand' -a '(__fish_craft_tools)' -d 'Call tool on default connection'
 
 # Global flags
 complete -c craft -s c -l config -d 'Path to craft.json'
@@ -304,12 +393,12 @@ complete -c craft -n '__fish_seen_subcommand_from call' -l tail-log -d 'Tail ser
 complete -c craft -n '__fish_seen_subcommand_from call' -l edit -d 'Edit arguments interactively'
 
 # Dynamic connection completions
-function __fish_craft_connections
-  craft _completion connections 2>/dev/null | tr ' ' '\\n'
-end
+complete -c craft -n '__fish_seen_subcommand_from use remove auth' -a '(__fish_craft_connections)'
+complete -c craft -n '__fish_seen_subcommand_from tools list' -a '(__fish_craft_connections)'
 
-complete -c craft -n '__fish_seen_subcommand_from use remove tools auth' -a '(__fish_craft_connections)'
-complete -c craft -n '__fish_seen_subcommand_from list call' -a '(__fish_craft_connections)'
+# Tool completions for connection-specific calls
+# When: craft <connection> <tab> -> show tools for that connection
+complete -c craft -f -n '__fish_craft_is_connection_cmd' -a '(__fish_craft_tools_for_connection (commandline -opc)[2])'
 `;
 }
 
@@ -363,7 +452,6 @@ export async function handleCompletions(args: string[]): Promise<void> {
   if (shell === 'unknown') {
     logError('Could not detect your shell. Please specify: craft completions [bash|zsh|fish]');
     process.exit(1);
-    return;
   }
 
   // Generate completion script
@@ -371,7 +459,6 @@ export async function handleCompletions(args: string[]): Promise<void> {
   if (!script) {
     logError(`Completion generation not supported for shell: ${shell}`);
     process.exit(1);
-    return;
   }
 
   // Get installation path
@@ -379,7 +466,6 @@ export async function handleCompletions(args: string[]): Promise<void> {
   if (!targetPath) {
     logError(`Could not determine installation path for shell: ${shell}`);
     process.exit(1);
-    return;
   }
 
   // Install the completion
@@ -477,11 +563,68 @@ async function handleCompletionHelper(args: string[]): Promise<void> {
     return;
   }
 
-  // Future: add tool name completions here
-  // if (type === 'tools' && args[1]) {
-  //   const connectionName = args[1];
-  //   // Load tools for connection and output names
-  // }
+  if (type === 'tools') {
+    try {
+      // Connection name is optional - if not provided, use default
+      const connectionName = args[1];
+      await handleToolCompletion(connectionName);
+    } catch {
+      // Silently fail - completions should be graceful
+      process.exit(0);
+    }
+    return;
+  }
 
   process.exit(0);
+}
+
+/**
+ * Get tool names for completion (with short timeout for responsiveness)
+ */
+async function handleToolCompletion(connectionName?: string): Promise<void> {
+  const { createCraftRuntime } = await import('../craft-runtime.js');
+  const { getDefaultConnection, getConnection } = await import('../craft-config.js');
+
+  try {
+    // If no connection specified, try to use default
+    let targetConnection = connectionName;
+    if (!targetConnection) {
+      const defaultConn = await getDefaultConnection();
+      if (!defaultConn) {
+        return;
+      }
+      targetConnection = defaultConn.name;
+    }
+
+    // Verify connection exists
+    const conn = await getConnection(targetConnection);
+    if (!conn) {
+      return;
+    }
+
+    // Create runtime with short timeout for completion responsiveness
+    const runtime = await createCraftRuntime(targetConnection, {
+      logger: { info: () => {}, warn: () => {}, error: () => {} }, // Silence logs for completions
+    });
+
+    try {
+      // Set a race with timeout to avoid hanging completions
+      const toolsPromise = runtime.listTools(conn.name, { autoAuthorize: false });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5000)
+      );
+
+      const tools = await Promise.race([toolsPromise, timeoutPromise]);
+      const toolNames = tools.map((tool) => tool.name);
+      console.log(toolNames.join(' '));
+    } finally {
+      await runtime.close().catch(() => {});
+    }
+  } catch (error) {
+    // Debug: output error to stderr in development
+    if (process.env.DEBUG_COMPLETIONS) {
+      console.error('Completion error:', error);
+    }
+    // Silently fail - completions should be graceful
+  }
 }
