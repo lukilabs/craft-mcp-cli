@@ -76,7 +76,7 @@ describe('list output helpers', () => {
     };
     const metadata = buildToolMetadata(tool);
     const detail = printToolDetail(adhocDefinition, metadata, false, true);
-    expect(detail.examples[0]).toContain("'https://mcp.sentry.dev/mcp?agent=1.use_sentry(");
+    expect(detail.examples[0]).toContain("mcp-sentry-dev-mcp use_sentry");
     logSpy.mockRestore();
   });
 

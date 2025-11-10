@@ -70,7 +70,7 @@ describe('CLI list formatting', () => {
     expect(lines.some((line) => line.includes('format?: "json" | "markdown"'))).toBe(true);
     expect(lines.some((line) => line.includes('dueBefore?: string'))).toBe(true);
     expect(lines.some((line) => line.includes('Examples:'))).toBe(true);
-    expect(lines.some((line) => line.includes('craft call calculator.add(a: 1'))).toBe(true);
+    expect(lines.some((line) => line.includes('craft calculator add a:1'))).toBe(true);
     expect(
       lines.some((line) => line.includes('Optional parameters hidden; run with --all-parameters to view all fields'))
     ).toBe(false);
@@ -194,12 +194,12 @@ describe('CLI list formatting', () => {
     await handleList(runtime, ['linear']);
 
     const lines = logSpy.mock.calls.map((call) => stripAnsi(call.join(' ')));
-    const exampleLines = lines.filter((line) => line.includes('craft call linear.'));
+    const exampleLines = lines.filter((line) => line.includes('craft linear list_documents'));
     expect(exampleLines).toHaveLength(1);
     const exampleLine = exampleLines[0] as string;
     expect(exampleLine.length).toBeLessThanOrEqual(90);
     // Note: With the shorter "craft" branding, this example now fits within the limit without truncation
-    expect(exampleLine).toContain('craft call linear.list_documents');
+    expect(exampleLine).toContain('craft linear list_documents');
 
     logSpy.mockRestore();
   });
@@ -350,7 +350,7 @@ describe('CLI list formatting', () => {
         function create_comment(issueId: string, parentId?: string, body: string): Comment;
 
         Examples:
-          craft call linear.list_documents(query: "value", limit: 1, orderBy: "createdAt")
+          craft linear list_documents query:"value" limit:1 orderBy:"createdAt"
 
         Optional parameters hidden; run with --all-parameters to view all fields.
 
