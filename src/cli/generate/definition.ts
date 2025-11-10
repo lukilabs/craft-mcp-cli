@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { CliArtifactMetadata } from '../../cli-metadata.js';
 import { type HttpCommand, loadServerDefinitions, type ServerDefinition, type StdioCommand } from '../../config.js';
+import { loadCraftServerDefinitions } from '../../craft-runtime.js';
 import type { Runtime, ServerToolInfo } from '../../runtime.js';
 import { createRuntime } from '../../runtime.js';
 import { extractHttpServerTarget, normalizeHttpUrl } from '../http-utils.js';
@@ -90,6 +91,14 @@ export async function resolveServerDefinition(
     }
   }
 
+  // Load Craft connections first (takes precedence)
+  const craftDefinitions = await loadCraftServerDefinitions();
+  const craftMatch = craftDefinitions.find((def) => def.name === trimmed);
+  if (craftMatch) {
+    return { definition: craftMatch, name: craftMatch.name };
+  }
+
+  // Fallback to general MCP config (for backward compatibility)
   const definitions = await loadServerDefinitions({
     configPath,
     rootDir,
@@ -127,11 +136,12 @@ export async function fetchTools(
   configPath?: string,
   rootDir?: string
 ): Promise<{ tools: ServerToolInfo[]; derivedDescription?: string }> {
-  // Reuse the runtime helper so bundle builds and CLI generation share the same discovery path.
+  // Use Craft connections if no config path is provided
+  // This ensures the CLI uses ~/.craft/config.json for the installed binary
   const runtime = await createRuntime({
     configPath,
     rootDir,
-    servers: configPath ? undefined : [definition],
+    servers: [definition],
   });
   try {
     const tools = await runtime.listTools(serverName, { includeSchema: true });

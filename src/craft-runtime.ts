@@ -7,9 +7,28 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { ServerDefinition } from './config.js';
-import { getConnection, getDefaultConnection, resolveConnection } from './craft-config.js';
+import { getConnection, getDefaultConnection, loadCraftConfig, resolveConnection } from './craft-config.js';
 import { validateCraftUrl } from './craft-validation.js';
 import { createRuntime, type Runtime, type RuntimeOptions } from './runtime.js';
+
+/**
+ * Load all Craft connections as server definitions
+ *
+ * @returns Array of server definitions for all Craft connections
+ */
+export async function loadCraftServerDefinitions(): Promise<ServerDefinition[]> {
+  const config = await loadCraftConfig();
+  return config.connections.map((conn) => ({
+    name: conn.name,
+    command: {
+      kind: 'http' as const,
+      url: new URL(conn.url),
+    },
+    description: conn.description,
+    auth: 'oauth',
+    tokenCacheDir: path.join(os.homedir(), '.craft', conn.name),
+  }));
+}
 
 /**
  * Create a Craft-only runtime that bypasses craft config loading

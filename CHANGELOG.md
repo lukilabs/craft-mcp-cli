@@ -6,6 +6,12 @@ All notable changes to Craft MCP CLI will be documented in this file.
 
 _No changes yet._
 
+## [1.0.1] - 2025-11-10
+
+### Fixed
+- Fixed `emit-ts` and `generate-cli` commands to use Craft connections from `~/.craft/config.json` instead of looking for `./config/craft.json` in the current directory
+- All commands now consistently use Craft-specific connection management, preventing conflicts with editor MCP server imports
+
 ## [1.0.0] - 2025-11-10
 
 Initial release of Craft MCP CLI - a command-line interface and SDK for Craft documents via Model Context Protocol.

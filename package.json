@@ -1,6 +1,6 @@
 {
   "name": "craft-mcp-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CLI and SDK for Craft documents via Model Context Protocol",
   "type": "module",
   "main": "./dist/sdk.js",
