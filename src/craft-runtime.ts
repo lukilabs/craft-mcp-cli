@@ -4,13 +4,15 @@
  * Provides programmatic API for calling Craft MCP tools using connection names
  */
 
+import os from 'node:os';
+import path from 'node:path';
 import type { ServerDefinition } from './config.js';
 import { getConnection, getDefaultConnection, resolveConnection } from './craft-config.js';
 import { validateCraftUrl } from './craft-validation.js';
 import { createRuntime, type Runtime, type RuntimeOptions } from './runtime.js';
 
 /**
- * Create a Craft-only runtime that bypasses mcporter config loading
+ * Create a Craft-only runtime that bypasses craft config loading
  *
  * This ensures only Craft connections from ~/.craft/config.json are loaded,
  * preventing conflicts with editor MCP imports.
@@ -48,6 +50,7 @@ export async function createCraftRuntime(
   validateCraftUrl(conn.url);
 
   // Create server definition for the Craft connection
+  // All Craft URLs require OAuth, so pre-configure it
   const serverDef: ServerDefinition = {
     name: conn.name,
     command: {
@@ -55,6 +58,8 @@ export async function createCraftRuntime(
       url: new URL(conn.url),
     },
     description: conn.description,
+    auth: 'oauth',
+    tokenCacheDir: path.join(os.homedir(), '.craft', conn.name),
   };
 
   // Create runtime with ONLY this server (bypasses config loading)
@@ -84,6 +89,7 @@ export async function craftCallOnce(params: {
   validateCraftUrl(conn.url);
 
   // Create ephemeral server definition
+  // All Craft URLs require OAuth, so pre-configure it
   const serverDef: ServerDefinition = {
     name: conn.name,
     command: {
@@ -91,6 +97,8 @@ export async function craftCallOnce(params: {
       url: new URL(conn.url),
     },
     description: conn.description,
+    auth: 'oauth',
+    tokenCacheDir: path.join(os.homedir(), '.craft', conn.name),
   };
 
   const runtime = await createRuntime({
@@ -124,6 +132,7 @@ export async function createCraftClient(connectionName: string) {
   validateCraftUrl(conn.url);
 
   // Create server definition
+  // All Craft URLs require OAuth, so pre-configure it
   const serverDef: ServerDefinition = {
     name: conn.name,
     command: {
@@ -131,6 +140,8 @@ export async function createCraftClient(connectionName: string) {
       url: new URL(conn.url),
     },
     description: conn.description,
+    auth: 'oauth',
+    tokenCacheDir: path.join(os.homedir(), '.craft', conn.name),
   };
 
   const runtime = await createRuntime({

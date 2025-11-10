@@ -1,15 +1,17 @@
 ---
-summary: 'Goals and requirements for mcporter generate-cli, including outputs, runtimes, and schema-aware UX.'
+summary: 'Goals and requirements for Craft MCP CLI generator (if implemented), including outputs, runtimes, and schema-aware UX.'
 read_when:
   - 'Changing generate-cli behavior or bundler integrations'
 ---
 
 # CLI Generator Plan
 
-Default behavior: generating `<server>.ts` in the working directory if no output path is provided. Bundling is opt-in via `--bundle` and produces a single JS file with shebang; otherwise we emit TypeScript targeting Node.js. Rolldown handles bundling by default unless the runtime resolves to Bun—in that case Bun’s native bundler is selected automatically (still requires `--runtime bun` or Bun auto-detection); `--bundler` lets you override either choice.
+> Note: This document describes a potential feature for generating standalone CLIs from Craft connections. This is a forked/adjusted version of the general MCP CLI, specifically tailored for Craft documents.
+
+Default behavior: generating `<connection>.ts` in the working directory if no output path is provided. Bundling is opt-in via `--bundle` and produces a single JS file with shebang; otherwise we emit TypeScript targeting Node.js. Rolldown handles bundling by default unless the runtime resolves to Bun—in that case Bun's native bundler is selected automatically (still requires `--runtime bun` or Bun auto-detection); `--bundler` lets you override either choice.
 
 ## Goal
-Create an `mcporter generate-cli` command that produces a standalone CLI for a single MCP server. The generated CLI should feel like a Unix tool: subcommands map to MCP tools, arguments translate to schema fields, and output can be piped/redirected easily.
+Create a `craft generate-cli` command (if implemented) that produces a standalone CLI for a single Craft connection. The generated CLI should feel like a Unix tool: subcommands map to Craft MCP tools, arguments translate to schema fields, and output can be piped/redirected easily.
 
 ## High-Level Requirements
 - **Input**: Identify the target server either by shorthand name or by providing an explicit MCP server definition.
@@ -22,14 +24,12 @@ Create an `mcporter generate-cli` command that produces a standalone CLI for a s
 
 ## Steps
 1. **Command Scaffolding**
-   - Add `generate-cli` subcommand to the existing CLI.
-   - Parse flags: `--server`, `--name`, `--command`, optional `--description`, plus `--output`, `--runtime=node|bun`, `--bundle`, `--bundler=rolldown|bun`, `--minify`, `--compile`, etc. Runtime auto-detects Bun when available, and the bundler inherits that choice unless overridden.
-2. **Server Resolution**
-   - If `--server` matches a configured name (via `loadServerDefinitions`), use that server definition.
-   - Otherwise, if the value looks like a file path, load a Cursor-style JSON definition from disk.
-   - Otherwise, attempt to parse inline JSON/JSON5.
-   - When `--command` (or the first positional argument) looks like a shell command (contains whitespace), split it into `command` + `args` and treat it as stdio. Otherwise, normalize HTTP selectors (`https://`, `http://`, or `host/path.tool`) so `generate-cli mcp.context7.com/mcp` autoconfigures an HTTP transport.
-   - Validate that a definition is found; prompt on failure.
+   - Add `generate-cli` subcommand to the existing CLI (if implemented).
+   - Parse flags: `--connection`, `--name`, `--url`, optional `--description`, plus `--output`, `--runtime=node|bun`, `--bundle`, `--bundler=rolldown|bun`, `--minify`, `--compile`, etc. Runtime auto-detects Bun when available, and the bundler inherits that choice unless overridden.
+2. **Connection Resolution**
+   - If `--connection` matches a configured Craft connection name (from `~/.craft/config.json`), use that connection.
+   - Otherwise, if a Craft MCP URL is provided, use it directly.
+   - Validate that a connection is found; prompt on failure.
 3. **Tool Introspection**
    - Use `listTools(server, { includeSchema: true })` to inspect MCP tool schemas.
    - For each tool, extract required/optional arguments, types, and defaults.
@@ -59,53 +59,60 @@ Create an `mcporter generate-cli` command that produces a standalone CLI for a s
 
 ## Usage Examples
 
+> Note: These examples are hypothetical and may not be implemented in the Craft fork.
+
 ```bash
-# Minimal: infer the name from the command URL and emit TypeScript (optionally bundle)
-npx mcporter generate-cli \
-  --command https://mcp.context7.com/mcp \
+# Minimal: infer the name from the Craft URL and emit TypeScript (optionally bundle)
+craft generate-cli \
+  --url https://mcp.craft.do/links/XXX/mcp \
   --minify
 
 # Provide explicit name/description and compile a Bun binary (falls back to Node if Bun missing)
-npx mcporter generate-cli \
-  --name context7 \
-  --command https://mcp.context7.com/mcp \
-  --description "Context7 docs MCP" \
+craft generate-cli \
+  --name work \
+  --url https://mcp.craft.do/links/XXX/mcp \
+  --description "Work documents CLI" \
   --runtime bun \
   --compile
 
-chmod +x context7
-./context7
+chmod +x work
+./work
   # show the embedded help + tool list
 
-# Shareable "one weird trick" for chrome-devtools (no config required)
-npx mcporter generate-cli --command "npx -y chrome-devtools-mcp@latest"
+# Use an existing connection from config
+craft generate-cli work --bundle dist/work.js
 
-- `--minify` shrinks the bundled output via the selected bundler (output defaults to `<server>.js`).
-- `--compile [path]` implies bundling and invokes `bun build --compile` to create the native executable (Bun only). When you omit the path, the compiled binary inherits the server name.
-- Use `--server '{...}'` when you need advanced configuration (headers, env vars, stdio commands, OAuth metadata).
-- Omit `--name` to let mcporter infer it from the command URL (for example, `https://mcp.context7.com/mcp` becomes `context7`).
-- When targeting an existing config entry, you can skip `--server` and pass the name as a positional argument:
-  `npx mcporter generate-cli linear --bundle dist/linear.js`.
-- When the MCP server is a stdio command, you can also skip `--command` by quoting the inline command as the first positional argument (e.g., `npx mcporter generate-cli "npx -y chrome-devtools-mcp@latest"`).
+- `--minify` shrinks the bundled output via the selected bundler (output defaults to `<connection>.js`).
+- `--compile [path]` implies bundling and invokes `bun build --compile` to create the native executable (Bun only). When you omit the path, the compiled binary inherits the connection name.
+- Use `--connection <name>` to reference an existing Craft connection from `~/.craft/config.json`.
+- Omit `--name` to let the CLI infer it from the connection name or URL.
+- When targeting an existing connection, you can pass the name as a positional argument:
+  `craft generate-cli work --bundle dist/work.js`.
 ```
 
 
 
 ## Artifact Metadata & Regeneration
 
-- Every generated artifact embeds its metadata (generator version, resolved server definition, invocation flags). A hidden `__mcporter_inspect` subcommand prints the payload without contacting the MCP server, so binaries remain self-describing even after being copied to another machine.
-- `mcporter inspect-cli <artifact>` shells out to that embedded command and prints a human summary (pass `--json` for raw output). The summary includes a ready-to-run `generate-cli` command you can reuse directly.
-- `mcporter generate-cli --from <artifact>` replays the stored invocation against the latest mcporter build. `--server`, `--runtime`, `--timeout`, `--minify/--no-minify`, `--bundle`, `--compile`, `--output`, and `--dry-run` let you override specific pieces of the stored metadata when necessary.
-- Because the metadata lives inside the artifact, any template, bundle, or compiled binary can be refreshed after a generator upgrade without juggling sidecar files.
+> Note: This section describes potential behavior if the feature is implemented.
+
+- Every generated artifact would embed its metadata (generator version, resolved Craft connection, invocation flags). A hidden `__craft_inspect` subcommand could print the payload without contacting the MCP server, so binaries remain self-describing even after being copied to another machine.
+- `craft inspect-cli <artifact>` could shell out to that embedded command and print a human summary (pass `--json` for raw output). The summary would include a ready-to-run `generate-cli` command you can reuse directly.
+- `craft generate-cli --from <artifact>` could replay the stored invocation against the latest Craft MCP CLI build. `--connection`, `--runtime`, `--timeout`, `--minify/--no-minify`, `--bundle`, `--compile`, `--output`, and `--dry-run` would let you override specific pieces of the stored metadata when necessary.
+- Because the metadata would live inside the artifact, any template, bundle, or compiled binary could be refreshed after a generator upgrade without juggling sidecar files.
 
 
 
 ## Status
-- ✅ `generate-cli` subcommand implemented with schema-aware proxy generation.
-- ✅ Inline JSON / file / shorthand server resolution wired up.
-- ✅ Bundling via Rolldown by default (or Bun automatically when the runtime is Bun, with `--bundler` available for overrides) plus optional minification and Bun bytecode compilation.
-- ✅ Integration tests cover bundling, minification, compiled binaries, and metadata/regeneration flows against the mock MCP server.
 
-Next steps:
+> Note: This feature may not be implemented in the Craft fork, as it's focused on direct Craft document interaction rather than generating standalone CLIs.
+
+If implemented:
+- `generate-cli` subcommand would implement schema-aware proxy generation.
+- Craft connection resolution from `~/.craft/config.json` would be wired up.
+- Bundling via Rolldown by default (or Bun automatically when the runtime is Bun, with `--bundler` available for overrides) plus optional minification and Bun bytecode compilation.
+- Integration tests would cover bundling, minification, compiled binaries, and metadata/regeneration flows against Craft MCP servers.
+
+Potential next steps:
 1. Add optional shell completion scaffolding if demand arises.
 2. Explore templated TypeScript definitions for generated CLIs to improve editor tooling.

@@ -11,10 +11,16 @@ export function maybeEnableOAuth(definition: ServerDefinition, logger: Logger): 
   if (definition.command.kind !== 'http') {
     return undefined;
   }
+
+  // Check if this is an adhoc source OR a Craft URL
   const isAdHocSource = definition.source && definition.source.kind === 'local' && definition.source.path === '<adhoc>';
-  if (!isAdHocSource) {
+  const isCraftUrl =
+    definition.command.url.hostname.endsWith('.craft.do') || definition.command.url.hostname.endsWith('.luki.io');
+
+  if (!isAdHocSource && !isCraftUrl) {
     return undefined;
   }
+
   const tokenCacheDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.craft', definition.name);
   logger.info(`Detected OAuth requirement for '${definition.name}'. Launching browser flow...`);
   return {

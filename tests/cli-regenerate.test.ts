@@ -60,7 +60,7 @@ describe('inspect/generate CLI artifacts', () => {
       .join('\n');
     expect(printed).toContain('Artifact:');
     expect(printed).toContain('Server: vercel');
-    expect(printed).toContain('mcporter generate-cli --from');
+    expect(printed).toContain('craft generate-cli --from');
     expect(printed).toContain('Underlying generate-cli command');
 
     logSpy.mockRestore();

@@ -93,7 +93,7 @@ export function formatCallExpressionExample(
   const selector = extra?.callSelector ?? serverName;
   const expression = `${selector}.${toolName}${callSuffix}`;
   const rendered = extra?.wrapExpression ? quoteShellExpression(expression) : expression;
-  return `mcporter call ${rendered}`;
+  return `craft call ${rendered}`;
 }
 
 export function formatExampleBlock(

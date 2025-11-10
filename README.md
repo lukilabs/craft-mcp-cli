@@ -118,10 +118,10 @@ craft list                                        # Show connections (alias)
 ### Tool Operations
 
 ```bash
-craft tools [connection]                          # List tools
-craft list <connection>                           # List tools with details
-craft <toolName> [args...]                        # Call tool on default connection
-craft <connection> <toolName> [args...]           # Call tool on specific connection
+craft tools [connection]                          # List tools for default or specified connection
+craft <connection>                               # List tools for specific connection (same as craft <connection> tools)
+craft <toolName> [args...]                       # Call tool on default connection
+craft <connection> <toolName> [args...]          # Call tool on specific connection
 ```
 
 ### Arguments

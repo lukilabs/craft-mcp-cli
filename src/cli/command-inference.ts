@@ -29,12 +29,19 @@ export async function inferCommandRouting(
       const nextToken = args[0];
       if (!nextToken) {
         // No command after connection name, list tools by default
-        return { kind: 'command', command: 'list', args: [], defaultConnection: token };
+        return { kind: 'command', command: 'tools', args: [], defaultConnection: token };
       }
 
       const remainingArgs = args.slice(1);
 
-      // Check if it's an explicit command (list, tools, call, auth, etc.)
+      // Check if it's an explicit command (list is reserved for connections only)
+      if (nextToken === 'list') {
+        // craft <connection> list is not valid - list is reserved for connections
+        console.error(
+          `'list' is reserved for listing connections. Use 'craft tools ${token}' to list tools for a connection.`
+        );
+        return { kind: 'abort', exitCode: 1 };
+      }
       if (isExplicitCommand(nextToken)) {
         return { kind: 'command', command: nextToken, args: remainingArgs, defaultConnection: token };
       }
@@ -63,7 +70,7 @@ export async function inferCommandRouting(
   }
 
   if (definitions.length === 0) {
-    // No mcporter definitions - check if there's a default Craft connection
+    // No craft config definitions - check if there's a default Craft connection
     try {
       const craftConfig = await loadCraftConfig();
       if (craftConfig.defaultConnection) {

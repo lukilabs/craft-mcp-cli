@@ -108,7 +108,7 @@ describe('formatCallExpressionExample', () => {
       baseOption({ property: 'teamId', required: true }),
       baseOption({ property: 'parentId', required: false }),
     ]);
-    expect(example).toBe('mcporter call linear.create_issue(title: "Bug", teamId: "example-id")');
+    expect(example).toBe('craft call linear.create_issue(title: "Bug", teamId: "example-id")');
   });
 
   it('wraps expressions when requested', () => {
@@ -118,7 +118,7 @@ describe('formatCallExpressionExample', () => {
       [baseOption({ property: 'request', required: true })],
       { callSelector: 'https://mcp.sentry.dev/mcp?agent=1', wrapExpression: true }
     );
-    expect(example).toBe('mcporter call \'https://mcp.sentry.dev/mcp?agent=1.use_sentry(request: "value")\'');
+    expect(example).toBe('craft call \'https://mcp.sentry.dev/mcp?agent=1.use_sentry(request: "value")\'');
   });
 });
 
@@ -126,9 +126,9 @@ describe('formatExampleBlock', () => {
   it('dedupes and truncates long call hints', () => {
     const lines = formatExampleBlock(
       [
-        'mcporter call linear.create_issue(title: "Bug", teamId: "ENG", description: "Long description goes here")',
-        'mcporter call linear.create_issue(title: "Bug", teamId: "ENG", description: "Long description goes here")',
-        'mcporter call linear.create_issue(title: "Bug", teamId: "ENG")',
+        'craft call linear.create_issue(title: "Bug", teamId: "ENG", description: "Long description goes here")',
+        'craft call linear.create_issue(title: "Bug", teamId: "ENG", description: "Long description goes here")',
+        'craft call linear.create_issue(title: "Bug", teamId: "ENG")',
       ],
       { maxExamples: 2, maxLength: 60 }
     );
@@ -176,7 +176,7 @@ describe('buildToolDoc', () => {
     expect(doc.tsSignature).toBe('function create_comment(issueId: string, body: string, parentId?: string): Comment;');
     expect(stripAnsi(doc.flagUsage)).toBe('--issue-id <issue-id> --body <body> [--parent-id <parent-id>]');
     expect(doc.optionalSummary).toBeUndefined();
-    expect(doc.examples[0]).toContain('mcporter call linear.create_comment');
+    expect(doc.examples[0]).toContain('craft call linear.create_comment');
     expect(doc.optionDocs.map((entry) => entry.flagLabel)).toEqual([
       '--issue-id <issue-id>',
       '--body <body>',

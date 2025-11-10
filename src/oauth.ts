@@ -13,6 +13,11 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { ServerDefinition } from './config.js';
 import { readJsonFile, writeJsonFile } from './fs-json.js';
+import {
+  discoverAuthorizationServerMetadata,
+  discoverProtectedResourceMetadata,
+  selectScopes,
+} from './oauth-discovery.js';
 
 const CALLBACK_HOST = '127.0.0.1';
 const CALLBACK_PATH = '/callback';
@@ -62,6 +67,67 @@ async function ensureDirectory(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
 
+// discoverOAuthScope performs OAuth discovery to determine the correct scope to use.
+async function discoverOAuthScope(serverUrl: URL, logger: OAuthLogger): Promise<string | undefined> {
+  logger.info(`Discovering OAuth metadata for ${serverUrl.toString()}...`);
+
+  try {
+    // Step 1: Discover Protected Resource Metadata (RFC 9728)
+    const resourceMetadata = await discoverProtectedResourceMetadata(serverUrl, logger);
+    if (!resourceMetadata) {
+      logger.warn('Failed to discover Protected Resource Metadata, falling back to default scope');
+      return undefined;
+    }
+
+    // Step 2: Get the first authorization server
+    if (!resourceMetadata.authorization_servers || resourceMetadata.authorization_servers.length === 0) {
+      logger.warn('No authorization servers found in Protected Resource Metadata');
+      return undefined;
+    }
+
+    const authServerUrl = resourceMetadata.authorization_servers[0];
+    if (!authServerUrl) {
+      logger.warn('Authorization server URL is empty');
+      return undefined;
+    }
+    logger.info(`Discovered authorization server: ${authServerUrl}`);
+
+    // Step 3: Discover Authorization Server Metadata (RFC 8414 / OpenID Connect)
+    const authServerMetadata = await discoverAuthorizationServerMetadata(authServerUrl, logger);
+    if (!authServerMetadata) {
+      logger.warn('Failed to discover Authorization Server Metadata');
+      return undefined;
+    }
+
+    // Step 4: Verify PKCE support (required by MCP spec)
+    if (
+      !authServerMetadata.code_challenge_methods_supported ||
+      authServerMetadata.code_challenge_methods_supported.length === 0
+    ) {
+      logger.warn('Authorization server does not advertise PKCE support (code_challenge_methods_supported)');
+      // MCP spec requires PKCE, but we'll try anyway
+    }
+
+    // Step 5: Select scopes according to MCP spec scope selection strategy
+    const selectedScopes = selectScopes({
+      scopesSupported: authServerMetadata.scopes_supported,
+      protectedResourceScopes: resourceMetadata.scopes_supported,
+    });
+
+    if (!selectedScopes || selectedScopes.length === 0) {
+      logger.info('No scopes discovered, omitting scope parameter as per MCP spec');
+      return undefined;
+    }
+
+    const scopeString = selectedScopes.join(' ');
+    logger.info(`Discovered OAuth scopes: ${scopeString}`);
+    return scopeString;
+  } catch (error) {
+    logger.warn(`OAuth discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
 // FileOAuthClientProvider persists OAuth session artifacts to disk and captures callback redirects.
 class FileOAuthClientProvider implements OAuthClientProvider {
   private readonly tokenPath: string;
@@ -78,7 +144,8 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     private readonly definition: ServerDefinition,
     tokenCacheDir: string,
     redirectUrl: URL,
-    logger: OAuthLogger
+    logger: OAuthLogger,
+    scopeOverride?: string
   ) {
     this.tokenPath = path.join(tokenCacheDir, 'tokens.json');
     this.clientInfoPath = path.join(tokenCacheDir, 'client.json');
@@ -92,7 +159,7 @@ class FileOAuthClientProvider implements OAuthClientProvider {
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'none',
-      scope: 'mcp:tools',
+      scope: scopeOverride ?? 'mcp:tools',
     };
   }
 
@@ -106,12 +173,38 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     const tokenDir = definition.tokenCacheDir ?? path.join(os.homedir(), '.craft', definition.name);
     await ensureDirectory(tokenDir);
 
+    // Perform OAuth discovery if this is an HTTP server
+    let discoveredScope: string | undefined;
+    if (definition.command.kind === 'http') {
+      discoveredScope = await discoverOAuthScope(definition.command.url, logger);
+    }
+
+    // Check if we have existing client information with a registered redirect URI
+    const clientInfoPath = path.join(tokenDir, 'client.json');
+    const existingClient = await readJsonFile<OAuthClientInformationMixed>(clientInfoPath);
+    const existingRedirectUri =
+      existingClient && 'redirect_uris' in existingClient ? existingClient.redirect_uris?.[0] : undefined;
+
     const server = http.createServer();
     const overrideRedirect = definition.oauthRedirectUrl ? new URL(definition.oauthRedirectUrl) : null;
-    const listenHost = overrideRedirect?.hostname ?? CALLBACK_HOST;
-    const desiredPort = overrideRedirect?.port ? Number.parseInt(overrideRedirect.port, 10) : undefined;
+
+    // If we have an existing redirect URI and no override, reuse it to avoid "unregistered redirect uri" errors
+    const reuseExisting = existingRedirectUri && !overrideRedirect;
+    const existingUrl = reuseExisting ? new URL(existingRedirectUri) : null;
+
+    const listenHost = overrideRedirect?.hostname ?? existingUrl?.hostname ?? CALLBACK_HOST;
+    const desiredPort = overrideRedirect?.port
+      ? Number.parseInt(overrideRedirect.port, 10)
+      : existingUrl?.port
+        ? Number.parseInt(existingUrl.port, 10)
+        : undefined;
     const callbackPath =
-      overrideRedirect?.pathname && overrideRedirect.pathname !== '/' ? overrideRedirect.pathname : CALLBACK_PATH;
+      overrideRedirect?.pathname && overrideRedirect.pathname !== '/'
+        ? overrideRedirect.pathname
+        : existingUrl?.pathname && existingUrl.pathname !== '/'
+          ? existingUrl.pathname
+          : CALLBACK_PATH;
+
     const port = await new Promise<number>((resolve, reject) => {
       server.listen(desiredPort ?? 0, listenHost, () => {
         const address = server.address();
@@ -126,15 +219,21 @@ class FileOAuthClientProvider implements OAuthClientProvider {
 
     const redirectUrl = overrideRedirect
       ? new URL(overrideRedirect.toString())
-      : new URL(`http://${listenHost}:${port}${callbackPath}`);
-    if (!overrideRedirect || overrideRedirect.port === '') {
+      : existingUrl
+        ? new URL(existingUrl.toString())
+        : new URL(`http://${listenHost}:${port}${callbackPath}`);
+
+    if (!overrideRedirect && !existingUrl) {
+      redirectUrl.port = String(port);
+      redirectUrl.pathname = callbackPath;
+    } else if (!overrideRedirect || overrideRedirect.port === '') {
       redirectUrl.port = String(port);
     }
     if (!overrideRedirect || overrideRedirect.pathname === '/' || overrideRedirect.pathname === '') {
       redirectUrl.pathname = callbackPath;
     }
 
-    const provider = new FileOAuthClientProvider(definition, tokenDir, redirectUrl, logger);
+    const provider = new FileOAuthClientProvider(definition, tokenDir, redirectUrl, logger, discoveredScope);
     provider.attachServer(server);
     return {
       provider,
@@ -224,6 +323,10 @@ class FileOAuthClientProvider implements OAuthClientProvider {
     this.authorizationDeferred = createDeferred<string>();
     openExternal(authorizationUrl.toString());
     this.logger.info(`If the browser did not open, visit ${authorizationUrl.toString()} manually.`);
+
+    // Wait for the authorization code from the browser callback
+    // This blocks until the user completes the OAuth flow
+    await this.authorizationDeferred.promise;
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {

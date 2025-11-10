@@ -1,73 +1,76 @@
 ---
-summary: 'Cheatsheet for the various mcporter call argument syntaxes and best practices.'
+summary: 'Cheatsheet for calling Craft MCP tools with various argument syntaxes.'
 read_when:
-  - 'Designing or debugging tool invocation UX'
+  - 'Designing or debugging Craft tool invocation'
 ---
 
 # Tool Calling Cheatsheet
 
-mcporter accepts multiple argument styles so you can match whatever feels most natural in your shell or script. Every style feeds the same validation pipeline (schema-driven type coercion, required-field checks, enum hints), so pick the one that's easiest to type.
+Craft MCP CLI accepts multiple argument styles for calling tools. Every style feeds the same validation pipeline (schema-driven type coercion, required-field checks), so pick the one that's easiest to type.
 
-## 1. Inferred Call Command
-
-```bash
-mcporter linear.list_issues team=ENG
-mcporter context7.resolve-library-id libraryName:value
-mcporter firecrawl.scrape 'url: "https://example.com"'
-```
-
-- Dotted tokens (`server.tool`) automatically run the `call` command.
-- Trailing arguments can use `key=value`, `key:value`, or `key: value` formats; multi-word values need normal shell quoting.
-- `server=value` / `tool=value` behave like their flag counterparts if you need to override the selector.
-
-## 2. Explicit `call` + Flags
+## 1. Default Connection
 
 ```bash
-mcporter call linear.create_issue --team ENG --title "Bug report"
-mcporter call chrome-devtools.take_snapshot output=markdown
-mcporter call context7.resolve-library-id libraryName: value
+craft collections_list
+craft blocks_get id:abc123
+craft blocks_update id:abc123 content:'{"type":"textBlock","content":"Hello"}'
 ```
 
-- Use `--flag value` when you prefer long-form CLI syntax.
-- Mixed forms are fine: `mcporter call linear.create_issue --team ENG title=value due: tomorrow`.
-- `--args '{"title":"Bug"}'` still ingests JSON payloads directly.
+- When no connection is specified, uses the default connection.
+- Arguments use `key:value` or `key=value` syntax.
+- Multi-word values need normal shell quoting.
 
-## 3. Function-Call Syntax
+## 2. Specific Connection
 
 ```bash
-mcporter call 'linear.create_issue(title: "Bug", team: "ENG")'
-mcporter 'context7.resolve-library-id(libraryName: "react")'
-mcporter 'context7.resolve-library-id("react")'
+craft work collections_list
+craft work blocks_get id:abc123
+craft personal blocks_update id:abc123 content:'{"type":"textBlock"}'
 ```
 
-- Mirrors the pseudo-TypeScript signature printed by `mcporter list`.
-- You may omit labels and rely on the schema order—`mcporter 'context7.resolve-library-id("react")'` maps the first argument to `libraryName` automatically.
-- Supports nested objects/arrays and gives detailed parser errors when the expression is malformed.
-- Wrap the whole expression in quotes so the shell leaves parentheses/commas intact.
+- Specify the connection name before the tool name.
+- Same argument syntax as default connection.
 
-## 4. Mixed Server/Tool Overrides
+## 3. With Arguments
 
 ```bash
-mcporter call --server linear resolve_library_id libraryName=value
-mcporter call --tool scrape firecrawl url=https://example.com
+# Using key:value syntax
+craft blocks_get id:abc123
+
+# Using key=value syntax
+craft blocks_update id=abc123 content='{"type":"textBlock"}'
+
+# JSON arguments
+craft blocks_update id:abc123 content:'{"type":"textBlock","content":"Hello World"}'
 ```
 
-- Pass `--server` / `--tool` when you want to reuse cached selectors or the command inference isn’t enough.
-- Anything after the selector uses the same unified key/value parsing.
+- Both `key:value` and `key=value` formats are supported.
+- JSON values should be quoted to prevent shell interpretation.
 
-## 5. Ad-hoc Servers
+## 4. Ad-hoc URLs
 
 ```bash
-mcporter call https://mcp.deepwiki.com/sse.ask_question repoName=value question:"What's new?"
-mcporter call --http-url https://mcp.example.com/mcp fetch_docs repoName=value
+craft 'https://mcp.craft.do/links/XXX/mcp' collections_list
+craft 'https://mcp.craft.do/links/XXX/mcp' blocks_get id:abc123
 ```
 
-- Bare URLs trigger ad-hoc server registration; you can still use all of the styles above for arguments.
-- Combine with `--stdio "bun run ./server.ts"` (plus `--stdio-arg`, `--env`, `--cwd`) for local transports.
+- Pass a Craft MCP URL directly to test before adding to config.
+- Same argument syntax applies.
+
+## 5. JSON Arguments from File
+
+```bash
+craft blocks_update --args @data.json
+echo '{"id":"abc123"}' | craft blocks_get --args -
+```
+
+- Use `--args @file.json` to read arguments from a file.
+- Use `--args -` to read from stdin.
 
 ---
 
 **Tips**
-- Use `mcporter list <server>` to see parameter names, return types, and example invocations.
-- Optional fields hide by default; add `--all-parameters` when listing a server to reveal everything.
-- `mcporter auth <server|url>` accepts the same ad-hoc flags, so you can authenticate immediately after a 401 without editing config.
+- Use `craft list [connection]` to see available tools and their parameters.
+- Use `craft tools [connection]` to see detailed tool signatures.
+- Use `craft use <name>` to set the default connection.
+- OAuth authentication: `craft auth <name|url>` when needed.

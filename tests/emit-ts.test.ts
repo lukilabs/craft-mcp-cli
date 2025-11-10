@@ -34,7 +34,7 @@ describe('emit-ts templates', () => {
     const docs = emitTsTestInternals.buildDocEntries('integration', [buildToolMetadata(listCommentsTool)], false);
     const metadata = {
       server: integrationDefinition,
-      generatorLabel: 'mcporter@test',
+      generatorLabel: 'craft@test',
       generatedAt: new Date('2025-11-07T00:00:00Z'),
     };
     const source = renderTypesModule({ interfaceName: 'IntegrationTools', docs, metadata });
@@ -47,7 +47,7 @@ describe('emit-ts templates', () => {
     const docs = emitTsTestInternals.buildDocEntries('integration', [buildToolMetadata(listCommentsTool)], true);
     const metadata = {
       server: integrationDefinition,
-      generatorLabel: 'mcporter@test',
+      generatorLabel: 'craft@test',
       generatedAt: new Date('2025-11-07T00:00:00Z'),
     };
     const source = renderClientModule({

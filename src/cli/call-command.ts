@@ -164,7 +164,7 @@ async function hydratePositionalArguments(
   const toolInfo = tools.find((entry) => entry.tool.name === tool);
   if (!toolInfo) {
     throw new Error(
-      `Unknown tool '${tool}' on server '${server}'. Double-check the name or run mcporter list ${server}.`
+      `Unknown tool '${tool}' on server '${server}'. Double-check the name or run craft tools ${server}.`
     );
   }
   if (!toolInfo.tool.inputSchema) {
@@ -299,26 +299,26 @@ function maybeReportConnectionIssue(server: string, tool: string, error: unknown
   const issue = analyzeConnectionError(error);
   const detail = summarizeIssueMessage(issue.rawMessage);
   if (issue.kind === 'auth') {
-    const authCommand = `mcporter auth ${server}`;
-    const hint = `[mcporter] Authorization required for ${server}. Run '${authCommand}'.${detail ? ` (${detail})` : ''}`;
+    const authCommand = `craft auth ${server}`;
+    const hint = `[craft] Authorization required for ${server}. Run '${authCommand}'.${detail ? ` (${detail})` : ''}`;
     console.error(yellowText(hint));
     return issue;
   }
   if (issue.kind === 'offline') {
-    const hint = `[mcporter] ${server} appears offline${detail ? ` (${detail})` : ''}.`;
+    const hint = `[craft] ${server} appears offline${detail ? ` (${detail})` : ''}.`;
     console.error(redText(hint));
     return issue;
   }
   if (issue.kind === 'http') {
     const status = issue.statusCode ? `HTTP ${issue.statusCode}` : 'an HTTP error';
-    const hint = `[mcporter] ${server}.${tool} responded with ${status}${detail ? ` (${detail})` : ''}.`;
+    const hint = `[craft] ${server}.${tool} responded with ${status}${detail ? ` (${detail})` : ''}.`;
     console.error(dimText(hint));
     return issue;
   }
   if (issue.kind === 'stdio-exit') {
     const exit = typeof issue.stdioExitCode === 'number' ? `code ${issue.stdioExitCode}` : 'an unknown status';
     const signal = issue.stdioSignal ? ` (signal ${issue.stdioSignal})` : '';
-    const hint = `[mcporter] STDIO server for ${server} exited with ${exit}${signal}.`;
+    const hint = `[craft] STDIO server for ${server} exited with ${exit}${signal}.`;
     console.error(redText(hint));
   }
   return issue;

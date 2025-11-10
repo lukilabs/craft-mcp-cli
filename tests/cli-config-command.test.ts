@@ -260,7 +260,7 @@ describe('mcporter config CLI', () => {
     const logs: string[] = [];
     const spy = vi.spyOn(console, 'log').mockImplementation(captureLog(logs));
     await expect(handleConfigCli(buildOptions({ configPath }), ['get', 'shadowverse'])).rejects.toThrow(
-      "[mcporter] Unknown server 'shadowverse'."
+      "[craft] Unknown server 'shadowverse'."
     );
     spy.mockRestore();
     expect(logs.join('\n')).toContain('Did you mean shadcn');

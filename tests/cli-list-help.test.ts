@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
 
-describe('mcporter list help shortcut', () => {
+describe('craft list help shortcut', () => {
   let previousNoForceExit: string | undefined;
 
   beforeEach(() => {

@@ -4,6 +4,7 @@ import fsPromises from 'node:fs/promises';
 import type { EphemeralServerSpec } from './cli/adhoc-server.js';
 import { handleCall as runHandleCall } from './cli/call-command.js';
 import { inferCommandRouting } from './cli/command-inference.js';
+import { handleCompletions } from './cli/completion-command.js';
 import { handleConfigCli } from './cli/config-command.js';
 import { handleEmitTs } from './cli/emit-ts-command.js';
 import { extractEphemeralServerFlags } from './cli/ephemeral-flags.js';
@@ -184,10 +185,21 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // Handle _completion helper before command inference
+  if (command === '_completion') {
+    await handleCompletions(args);
+    return;
+  }
+
+  if (command === 'completions') {
+    await handleCompletions(args);
+    return;
+  }
+
   if (command === 'tools') {
     const connectionName = args[0];
 
-    // Create Craft-only runtime (bypasses mcporter config loading)
+    // Create Craft-only runtime (bypasses craft config loading)
     const runtime = await createCraftRuntime(connectionName, {
       logger: getActiveLogger(),
       oauthTimeoutMs: oauthTimeoutOverride,
@@ -237,7 +249,7 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
-  // Infer command without loading mcporter config (pass empty definitions)
+  // Infer command without loading craft config (pass empty definitions)
   // This allows Craft connection routing to work properly
   const inference = await inferCommandRouting(command, args, []);
   if (inference.kind === 'abort') {
@@ -248,7 +260,7 @@ export async function runCli(argv: string[]): Promise<void> {
   const resolvedArgs = inference.args;
   const defaultConnection = inference.kind === 'command' ? inference.defaultConnection : undefined;
 
-  // Create Craft-only runtime (bypasses mcporter config loading)
+  // Create Craft-only runtime (bypasses craft config loading)
   const runtime = await createCraftRuntime(defaultConnection, {
     logger: getActiveLogger(),
     oauthTimeoutMs: oauthTimeoutOverride,
@@ -262,6 +274,23 @@ export async function runCli(argv: string[]): Promise<void> {
         return;
       }
       await handleList(runtime, resolvedArgs, defaultConnection);
+      return;
+    }
+
+    if (resolvedCommand === 'tools') {
+      const { handleList } = await import('./cli/list-command.js');
+      if (!defaultConnection) {
+        const conn = await getDefaultConnection();
+        if (!conn) {
+          console.error('No default connection set. Use: craft use <name>');
+          process.exit(1);
+          return;
+        }
+        await handleList(runtime, [conn.url, ...resolvedArgs], undefined);
+      } else {
+        const conn = await getConnection(defaultConnection);
+        await handleList(runtime, [conn.url, ...resolvedArgs], undefined);
+      }
       return;
     }
 
@@ -391,8 +420,8 @@ function buildCommandSections(colorize: boolean): string[] {
       entries: [
         {
           name: 'list',
-          summary: 'List Craft connections or tools',
-          usage: 'craft list [connection] [--schema]',
+          summary: 'List Craft connections',
+          usage: 'craft list',
         },
         {
           name: 'tools',
@@ -443,6 +472,11 @@ function buildCommandSections(colorize: boolean): string[] {
           name: 'config',
           summary: 'Inspect or edit config files (list, get, add, remove, import, login, logout)',
           usage: 'craft config <command> [options]',
+        },
+        {
+          name: 'completions',
+          summary: 'Install shell completions (auto-detects shell)',
+          usage: 'craft completions',
         },
       ],
     },

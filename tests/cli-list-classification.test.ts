@@ -106,7 +106,7 @@ describe('CLI list classification and routing', () => {
     await handleList(runtime, ['https://mcp.supabase.com/mcp']);
 
     const hinted = warnSpy.mock.calls.some((call) =>
-      (call[0]?.toString() ?? '').includes("Next: run 'mcporter auth https://mcp.supabase.com/mcp'")
+      (call[0]?.toString() ?? '').includes("Next: run 'craft auth https://mcp.supabase.com/mcp'")
     );
     expect(hinted).toBe(true);
 

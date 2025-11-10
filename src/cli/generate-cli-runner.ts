@@ -158,7 +158,7 @@ export function buildGenerateCliCommand(
   definition: SerializedServerDefinition,
   globalFlags: FlagMap = {}
 ): string {
-  const tokens: string[] = ['mcporter'];
+  const tokens: string[] = ['craft'];
   const configPath = invocation.configPath ?? globalFlags['--config'];
   const rootDir = invocation.rootDir ?? globalFlags['--root'];
   if (configPath) {

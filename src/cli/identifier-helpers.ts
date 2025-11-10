@@ -66,11 +66,11 @@ export function renderIdentifierResolutionMessages(context: IdentifierResolution
   if (context.resolution.kind === 'auto') {
     const noun = context.entity === 'tool' ? 'tool call' : 'server name';
     return {
-      auto: `[mcporter] Auto-corrected ${noun} to ${resolvedDisplay} (input: ${attemptedDisplay}).`,
+      auto: `[craft] Auto-corrected ${noun} to ${resolvedDisplay} (input: ${attemptedDisplay}).`,
     };
   }
   return {
-    suggest: `[mcporter] Did you mean ${resolvedDisplay}?`,
+    suggest: `[craft] Did you mean ${resolvedDisplay}?`,
   };
 }
 

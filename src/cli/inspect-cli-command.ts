@@ -42,7 +42,7 @@ export async function handleInspectCli(args: string[]): Promise<void> {
   }
   const dryRunCommand = buildGenerateCliCommand(metadata.invocation, metadata.server.definition);
   console.log('Regenerate with:');
-  console.log(`  mcporter generate-cli --from ${shellQuote(parsed.artifactPath)}`);
+  console.log(`  craft generate-cli --from ${shellQuote(parsed.artifactPath)}`);
   if (dryRunCommand) {
     console.log('Underlying generate-cli command:');
     console.log(`  ${dryRunCommand}`);

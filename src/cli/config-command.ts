@@ -90,7 +90,7 @@ export async function handleConfigCli(options: ConfigCliOptions, args: string[])
       printConfigHelp(args[0]);
       return;
     default:
-      throw new CliUsageError(`Unknown config subcommand '${subcommand}'. Run 'mcporter config --help'.`);
+      throw new CliUsageError(`Unknown config subcommand '${subcommand}'. Run 'craft config --help'.`);
   }
 }
 
@@ -104,7 +104,7 @@ function printConfigHelp(subcommand?: string): void {
     return;
   }
   const colorize = COLOR_ENABLED();
-  const title = colorize ? boldText('mcporter config') : 'mcporter config';
+  const title = colorize ? boldText('craft config') : 'craft config';
   const subtitle = colorize
     ? dimText('Manage configured MCP servers, imports, and ad-hoc discoveries.')
     : 'Manage configured MCP servers, imports, and ad-hoc discoveries.';
@@ -130,9 +130,9 @@ function printConfigHelp(subcommand?: string): void {
   }
   lines.push('', examplesHeader);
   const exampleList = [
-    'pnpm mcporter config list --json',
-    'pnpm mcporter config add linear https://mcp.linear.app/mcp',
-    'pnpm mcporter config import cursor --copy',
+    'craft config list --json',
+    'craft config add linear https://mcp.linear.app/mcp',
+    'craft config import cursor --copy',
   ];
   for (const entry of exampleList) {
     lines.push(`  ${colorize ? extraDimText(entry) : entry}`);
@@ -260,7 +260,7 @@ async function handleGetCommand(options: ConfigCliOptions, args: string[]): Prom
   const flags = extractGetFlags(args);
   const name = args.shift();
   if (!name) {
-    throw new CliUsageError('Usage: mcporter config get <name>');
+    throw new CliUsageError('Usage: craft config get <name>');
   }
   const servers = await loadServerDefinitions(options.loadOptions);
   const target = resolveServerDefinition(name, servers);
@@ -301,7 +301,7 @@ function extractGetFlags(args: string[]): { format: 'text' | 'json' } {
 async function handleAddCommand(options: ConfigCliOptions, args: string[]): Promise<void> {
   const name = args.shift();
   if (!name) {
-    throw new CliUsageError('Usage: mcporter config add <name> [target]');
+    throw new CliUsageError('Usage: craft config add <name> [target]');
   }
   let positionalTarget: string | undefined;
   if (args[0] && !args[0].startsWith('--')) {
@@ -553,7 +553,7 @@ function validateTransportChoice(entry: RawEntry, transport: AddFlags['transport
 async function handleRemoveCommand(options: ConfigCliOptions, args: string[]): Promise<void> {
   const name = args.shift();
   if (!name) {
-    throw new CliUsageError('Usage: mcporter config remove <name>');
+    throw new CliUsageError('Usage: craft config remove <name>');
   }
   const { config, path: configPath } = await loadOrCreateConfig(options.loadOptions);
   const targetName = findServerNameWithFuzzyMatch(name, Object.keys(config.mcpServers ?? {}));
@@ -569,7 +569,7 @@ async function handleRemoveCommand(options: ConfigCliOptions, args: string[]): P
 async function handleImportCommand(options: ConfigCliOptions, args: string[]): Promise<void> {
   const kind = args.shift();
   if (!kind) {
-    throw new CliUsageError('Usage: mcporter config import <kind>');
+    throw new CliUsageError('Usage: craft config import <kind>');
   }
   const flags = extractImportFlags(args);
   const rootDir = options.loadOptions.rootDir ?? process.cwd();
@@ -650,7 +650,7 @@ function extractImportFlags(args: string[]): ImportFlags {
 
 async function handleLoginCommand(options: ConfigCliOptions, args: string[]): Promise<void> {
   if (args.length === 0) {
-    throw new CliUsageError('Usage: mcporter config login <name|url>');
+    throw new CliUsageError('Usage: craft config login <name|url>');
   }
   await options.invokeAuth([...args]);
 }
@@ -658,7 +658,7 @@ async function handleLoginCommand(options: ConfigCliOptions, args: string[]): Pr
 async function handleLogoutCommand(options: ConfigCliOptions, args: string[]): Promise<void> {
   const name = args.shift();
   if (!name) {
-    throw new CliUsageError('Usage: mcporter config logout <name>');
+    throw new CliUsageError('Usage: craft config logout <name>');
   }
   const servers = await loadServerDefinitions(options.loadOptions);
   const target = resolveServerDefinition(name, servers);
@@ -745,7 +745,7 @@ function printImportSummary(importServers: ServerDefinition[]): void {
     const pathLabel = colorize ? dimText(path) : path;
     console.log(`  ${pathLabel} — ${countLabel} (${sample}${suffix})`);
   }
-  const guidance = 'Use `mcporter config import <kind>` to copy them locally.';
+  const guidance = 'Use `craft config import <kind>` to copy them locally.';
   console.log(colorize ? dimText(guidance) : guidance);
 }
 
@@ -759,7 +759,7 @@ function resolveServerDefinition(name: string, servers: ServerDefinition[]): Ser
     servers.map((server) => server.name)
   );
   if (!resolution) {
-    throw new CliUsageError(`[mcporter] Unknown server '${name}'.`);
+    throw new CliUsageError(`[craft] Unknown server '${name}'.`);
   }
   const messages = renderIdentifierResolutionMessages({
     entity: 'server',
@@ -778,7 +778,7 @@ function resolveServerDefinition(name: string, servers: ServerDefinition[]): Ser
   if (messages.suggest) {
     console.log(dimText(messages.suggest));
   }
-  throw new CliUsageError(`[mcporter] Unknown server '${name}'.`);
+  throw new CliUsageError(`[craft] Unknown server '${name}'.`);
 }
 
 function findServerNameWithFuzzyMatch(name: string, candidates: string[]): string | null {

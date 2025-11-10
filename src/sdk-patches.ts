@@ -221,7 +221,7 @@ function patchStdioClose(): void {
       }
       const shouldPrint = STDIO_LOGS_ENABLED || (typeof meta.code === 'number' && meta.code !== 0);
       if (shouldPrint && meta.chunks.length > 0) {
-        const heading = meta.command ? `[mcporter] stderr from ${meta.command}` : '[mcporter] stderr from stdio server';
+        const heading = meta.command ? `[craft] stderr from ${meta.command}` : '[craft] stderr from stdio server';
         console.log(heading);
         process.stdout.write(meta.chunks.join(''));
         if (!meta.chunks[meta.chunks.length - 1]?.endsWith('\n')) {

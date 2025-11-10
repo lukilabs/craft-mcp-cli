@@ -172,23 +172,17 @@ class McpRuntime implements Runtime {
     const autoAuthorize = options.autoAuthorize !== false;
     const context = await this.connect(server, {
       maxOAuthAttempts: autoAuthorize ? undefined : 0,
-      skipCache: !autoAuthorize,
+      // Allow using cached connections even when not auto-authorizing
+      // This way already-authenticated connections work in batch listings
+      skipCache: false,
     });
-    try {
-      const response = await context.client.listTools({ server: {} });
-      return (response.tools ?? []).map((tool) => ({
-        name: tool.name,
-        description: tool.description ?? undefined,
-        inputSchema: options.includeSchema ? tool.inputSchema : undefined,
-        outputSchema: options.includeSchema ? tool.outputSchema : undefined,
-      }));
-    } finally {
-      if (!autoAuthorize) {
-        await context.client.close().catch(() => {});
-        await closeTransportAndWait(this.logger, context.transport).catch(() => {});
-        await context.oauthSession?.close().catch(() => {});
-      }
-    }
+    const response = await context.client.listTools({ server: {} });
+    return (response.tools ?? []).map((tool) => ({
+      name: tool.name,
+      description: tool.description ?? undefined,
+      inputSchema: options.includeSchema ? tool.inputSchema : undefined,
+      outputSchema: options.includeSchema ? tool.outputSchema : undefined,
+    }));
   }
 
   // callTool executes a tool using the args provided by the caller.
@@ -212,7 +206,8 @@ class McpRuntime implements Runtime {
     // Reuse cached connections unless the caller explicitly opted out.
     const normalized = server.trim();
 
-    const useCache = options.skipCache !== true && options.maxOAuthAttempts === undefined;
+    // Use cache unless explicitly skipped. Allow maxOAuthAttempts: 0 to use cached auth connections.
+    const useCache = options.skipCache !== true;
 
     if (useCache) {
       const existing = this.clients.get(normalized);
@@ -301,7 +296,9 @@ class McpRuntime implements Runtime {
           throw new Error(`Server '${activeDefinition.name}' is not configured for HTTP transport.`);
         }
         let oauthSession: OAuthSession | undefined;
-        const shouldEstablishOAuth = activeDefinition.auth === 'oauth' && options.maxOAuthAttempts !== 0;
+        // Always create OAuth session when auth is configured, even with maxOAuthAttempts: 0
+        // This ensures we can use cached tokens without opening browser
+        const shouldEstablishOAuth = activeDefinition.auth === 'oauth';
         if (shouldEstablishOAuth) {
           oauthSession = await createOAuthSession(activeDefinition, this.logger);
         }
@@ -320,13 +317,7 @@ class McpRuntime implements Runtime {
         const attemptConnect = async () => {
           const streamableTransport = new StreamableHTTPClientTransport(command.url, baseOptions);
           try {
-            await this.connectWithAuth(
-              client,
-              streamableTransport,
-              oauthSession,
-              activeDefinition.name,
-              options.maxOAuthAttempts
-            );
+            await this.connectWithAuth(client, streamableTransport, oauthSession, activeDefinition.name);
             return {
               client,
               transport: streamableTransport,
@@ -343,15 +334,17 @@ class McpRuntime implements Runtime {
           return await attemptConnect();
         } catch (primaryError) {
           if (isUnauthorizedError(primaryError)) {
-            await oauthSession?.close().catch(() => {});
-            oauthSession = undefined;
             const promoted = maybeEnableOAuth(activeDefinition, this.logger);
             if (promoted && options.maxOAuthAttempts !== 0) {
+              // Don't close session on promotion - it should be undefined anyway
               activeDefinition = promoted;
               this.definitions.set(promoted.name, promoted);
               continue;
             }
+            // Only close session if we're not retrying
+            await oauthSession?.close().catch(() => {});
           }
+          // For non-auth errors, don't close the session - let it continue or fail naturally
           if (primaryError instanceof OAuthTimeoutError) {
             await oauthSession?.close().catch(() => {});
             throw primaryError;
@@ -359,6 +352,7 @@ class McpRuntime implements Runtime {
           // Craft connections only support streamable HTTP, not SSE.
           // Skip SSE fallback for Craft URLs and throw the original error.
           if (isCraftUrl(command.url)) {
+            await oauthSession?.close().catch(() => {});
             throw primaryError;
           }
           if (primaryError instanceof Error) {
@@ -368,13 +362,7 @@ class McpRuntime implements Runtime {
             ...baseOptions,
           });
           try {
-            await this.connectWithAuth(
-              client,
-              sseTransport,
-              oauthSession,
-              activeDefinition.name,
-              options.maxOAuthAttempts
-            );
+            await this.connectWithAuth(client, sseTransport, oauthSession, activeDefinition.name);
             return { client, transport: sseTransport, definition: activeDefinition, oauthSession };
           } catch (sseError) {
             await closeTransportAndWait(this.logger, sseTransport).catch(() => {});
@@ -397,53 +385,19 @@ class McpRuntime implements Runtime {
     });
   }
 
-  // connectWithAuth retries MCP connect calls while the OAuth flow progresses.
+  // connectWithAuth handles initial connection and OAuth flow if needed.
   private async connectWithAuth(
     client: Client,
     transport: Transport & {
       close(): Promise<void>;
       finishAuth?: (authorizationCode: string) => Promise<void>;
     },
-    session?: OAuthSession,
-    serverName?: string,
-    maxAttempts = 3
+    _session?: OAuthSession,
+    _serverName?: string
   ): Promise<void> {
-    let attempt = 0;
-    while (true) {
-      try {
-        await client.connect(transport);
-        return;
-      } catch (error) {
-        if (!isUnauthorizedError(error) || !session) {
-          throw error;
-        }
-        attempt += 1;
-        if (attempt > maxAttempts) {
-          throw error;
-        }
-        this.logger.warn(
-          `OAuth authorization required for '${serverName ?? 'unknown'}'. Waiting for browser approval...`
-        );
-        try {
-          const code = await waitForAuthorizationCodeWithTimeout(
-            session,
-            this.logger,
-            serverName,
-            this.oauthTimeoutMs ?? OAUTH_CODE_TIMEOUT_MS
-          );
-          if (typeof transport.finishAuth === 'function') {
-            await transport.finishAuth(code);
-            this.logger.info('Authorization code accepted. Retrying connection...');
-          } else {
-            this.logger.warn('Transport does not support finishAuth; cannot complete OAuth flow automatically.');
-            throw error;
-          }
-        } catch (authError) {
-          this.logger.error('OAuth authorization failed while waiting for callback.', authError);
-          throw authError;
-        }
-      }
-    }
+    // Simply connect - if OAuth is configured, the authProvider will handle the flow automatically
+    // through the transport's internal retry mechanism
+    await client.connect(transport);
   }
 }
 

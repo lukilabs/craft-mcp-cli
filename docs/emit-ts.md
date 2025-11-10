@@ -1,19 +1,19 @@
 ---
-summary: 'How to generate `.d.ts` files or typed client helpers with mcporter emit-ts.'
+summary: 'How to generate `.d.ts` files or typed client helpers with craft emit-ts.'
 read_when:
   - 'Adding new emit-ts behavior or troubleshooting generated clients'
 ---
 
-# `mcporter emit-ts`
+# `craft emit-ts`
 
-`mcporter emit-ts` turns a configured MCP server into TypeScript artifacts so
+`craft emit-ts` turns a configured MCP server into TypeScript artifacts so
 agents, tests, and tooling can consume the server through strongly typed APIs.
-It reuses the same `buildToolDoc()` data that powers `mcporter list`, so doc
+It reuses the same `buildToolDoc()` data that powers `craft list`, so doc
 comments, parameter hints, and signatures stay perfectly in sync. For a broader
 overview of every CLI command, see `docs/cli-reference.md`.
 
 ```
-mcporter emit-ts <server> --out linear-client.ts \
+craft emit-ts <connection> --out linear-client.ts \
   [--mode types|client] \
   [--include-optional]
 ```
@@ -36,13 +36,13 @@ whenever the server schema changes.
 ### 1. Types-only header
 
 ```
-mcporter emit-ts linear --out types/linear-tools.d.ts
+craft emit-ts <connection> --out types/linear-tools.d.ts
 ```
 
 Produces:
 
 ```ts
-import type { CallResult } from 'mcporter';
+import type { CallResult } from 'craft-mcp-cli';
 
 export interface LinearTools {
   /**
@@ -60,7 +60,7 @@ Include the file in your agent/project and you can type-check code like
 ### 2. Client wrappers
 
 ```
-mcporter emit-ts linear --mode client --out clients/linear.ts
+craft emit-ts <connection> --mode client --out clients/linear.ts
 ```
 
 Generates two files:
@@ -70,7 +70,7 @@ Generates two files:
   `createCallResult`, then exposes a `createLinearClient()` factory:
 
 ```ts
-const client = await createLinearClient({ configPath: './mcporter.json' });
+const client = await createLinearClient({ configPath: './craft.json' });
 const comments = await client.list_comments({ issueId: 'LIN-1234' });
 console.log(comments.text());
 await client.close();

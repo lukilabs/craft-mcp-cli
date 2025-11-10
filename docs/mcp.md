@@ -1,44 +1,81 @@
 ---
-summary: 'High-level overview of mcporter’s runtime, entry points, and reusable helpers.'
+summary: 'High-level overview of Craft MCP CLI, a forked/adjusted version specifically for Craft documents.'
 read_when:
-  - 'Onboarding to this repository or explaining mcporter to others'
+  - 'Onboarding to this repository or explaining Craft MCP CLI to others'
 ---
 
-# mcporter Overview
+# Craft MCP CLI Overview
 
-mcporter is the Sweetistics CLI + runtime for the Model Context Protocol (MCP). It wraps the upstream TypeScript SDK with:
+Craft MCP CLI is a forked/adjusted version of the general MCP CLI, specifically tailored for Craft documents via the Model Context Protocol (MCP). It provides a focused CLI and SDK for working with Craft documents.
 
-- **Runtime orchestration** – `createRuntime` loads servers from config JSON, editor imports, or ad-hoc flags and handles OAuth retries, transport promotion, and cleanup.
-- **CLI surfaces** – `mcporter list`, `mcporter call`, `mcporter generate-cli`, `mcporter emit-ts`, and `mcporter inspect-cli` expose the runtime features to humans and scripts.
-- **Tooling helpers** – `createServerProxy` maps MCP tools to camelCase methods for Node/Bun scripts and returns `CallResult` helpers (`.text()`, `.markdown()`, `.json()`).
+## Key Features
+
+- **Craft-focused** – Designed specifically for Craft document connections (doc and daily-notes types)
+- **Simple connection management** – Add, list, and switch between multiple Craft connections
+- **Direct tool calls** – Call Craft MCP tools directly from the command line
+- **TypeScript SDK** – Build automations with `craftCallOnce()` and `createCraftClient()`
+- **Zero config conflicts** – Uses `~/.craft/config.json`, isolated from other MCP tools
+- **Auto-discovery** – Automatically detects connection type (doc vs daily-notes)
 
 ## Primary Commands
 
-- `npx mcporter list [server|--http-url|--stdio]`  
-  Lists tool metadata, renders TypeScript-style signatures, and surfaces copy/pasteable examples (including ad-hoc HTTP selectors).
-- `npx mcporter call server.tool key=value …`  
-  Invokes a tool via either flag syntax or the function-call expression form; add `--output json` to capture structured responses.
-- `npx mcporter generate-cli --server name [--bundle|--compile]`  
-  Emits a standalone CLI for a single MCP server. Bundling defaults to Rolldown unless the runtime resolves to Bun; compiled binaries require Bun.
-- `npx mcporter emit-ts <server> --mode types|client`  
-  Produces `.d.ts` files or typed client factories that mirror the CLI schema output.
-- `npx mcporter inspect-cli dist/server.js`  
-  Reads embedded metadata so you can regenerate a CLI without guesswork.
+- `craft list [connection]`  
+  Lists all configured Craft connections with their status and available tools.
+- `craft <connection> <tool> [args...]` or `craft <tool> [args...]`  
+  Invokes a Craft MCP tool with arguments using `key:value` or `key=value` syntax.
+- `craft add <name> <url> [--description <desc>]`  
+  Adds a new Craft connection to the config.
+- `craft remove <name>`  
+  Removes a Craft connection.
+- `craft use <name>`  
+  Sets the default connection.
+- `craft tools [connection]`  
+  Lists available tools for a connection.
+- `craft auth <name|url>`  
+  Completes OAuth authentication for a Craft connection.
 
-## Runtime Helpers
+## TypeScript SDK
 
-Use `createServerProxy(runtime, name)` inside scripts when you want ergonomic camelCase calls instead of kebab-case tool names. The proxy:
+Use the SDK to build automations:
 
-1. Validates arguments against the MCP schema.
-2. Automatically merges default values.
-3. Returns a `CallResult` helper so you can render `.text()`, `.markdown()`, or `.json()` without manual parsing.
+```typescript
+import { craftCallOnce, createCraftClient } from 'craft-mcp-cli';
 
-When you need raw access (custom transports, streaming), use the bare `Client` from `@modelcontextprotocol/sdk` or inspect `runtime.connect(name)` for lower-level control.
+// One-shot tool call
+const result = await craftCallOnce({
+  connection: 'work',
+  tool: 'collections_list'
+});
+
+// Persistent client
+const client = await createCraftClient('work');
+const tools = await client.listTools();
+const collections = await client.callTool('collections_list');
+await client.close();
+```
+
+## Configuration
+
+Connections are stored in `~/.craft/config.json`:
+
+```json
+{
+  "connections": [
+    {
+      "name": "work",
+      "url": "https://mcp.craft.do/links/XXX/mcp",
+      "type": "doc",
+      "description": "Work documents"
+    }
+  ],
+  "defaultConnection": "work"
+}
+```
 
 ## Debug + Support Docs
 
-- **Ad-hoc MCP Servers** (`docs/adhoc.md`) – explains the `--http-url` / `--stdio` flags.
-- **Tool Calling Cheatsheet** (`docs/tool-calling.md`) – shows the two argument styles and when to use each.
-- **Hang Diagnostics** (`docs/hang-debug.md` + `docs/tmux.md`) – run long-lived commands inside tmux and dump active handles if shutdown stalls.
+- **Configuration** (`docs/config.md`) – explains the Craft-specific config structure.
+- **Tool Calling** (`docs/tool-calling.md`) – shows argument syntax and usage patterns.
+- **OAuth Implementation** (`docs/oauth-implementation.md`) – details on OAuth flows for Craft connections.
 
-Read these docs (via `pnpm run docs:list`) whenever your task touches the corresponding area. They contain the up-to-date guardrails used across Sweetistics repositories.
+Read these docs (via `pnpm run docs:list`) whenever your task touches the corresponding area.

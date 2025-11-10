@@ -1,5 +1,5 @@
 ---
-summary: 'Tmux-based manual testing recipe for exercising mcporter against real MCP servers.'
+summary: 'Tmux-based manual testing recipe for exercising craft against real MCP servers.'
 read_when:
   - 'Need to reproduce a bug or verify CLI output by hand'
 ---
@@ -24,19 +24,19 @@ sleep 2
 cat /tmp/list-all.log
 ```
 
-The summary shows which servers are healthy, require auth, or are offline. Choose one of the "healthy" entries (e.g., `shadcn`, `firecrawl`, `obsidian-mcp-tools`) for the manual checks below.
+The summary shows which connections are healthy, require auth, or are offline. Choose one of the "healthy" entries for the manual checks below.
 
 ## Test matrix
 
-For each server under test, run the following commands, adjusting `SERVER`, `TOOL`, and arguments as needed. Each command writes to `/tmp` so logs are easy to share.
+For each connection under test, run the following commands, adjusting `CONNECTION`, `TOOL`, and arguments as needed. Each command writes to `/tmp` so logs are easy to share.
 
 ### List command
 
 ```bash
-tmux new-session -d -s list-SERVER \
-  'pnpm exec tsx src/cli.ts list SERVER --timeout 2000 > /tmp/list-SERVER.log 2>&1; sleep 5'
+tmux new-session -d -s list-CONNECTION \
+  'pnpm exec tsx src/cli.ts list CONNECTION --timeout 2000 > /tmp/list-CONNECTION.log 2>&1; sleep 5'
 sleep 2
-cat /tmp/list-SERVER.log
+cat /tmp/list-CONNECTION.log
 ```
 
 Verify:
@@ -46,10 +46,10 @@ Verify:
 ### Call command
 
 ```bash
-tmux new-session -d -s call-SERVER \
-  'pnpm exec tsx src/cli.ts call SERVER.toolName key=value --timeout 2000 > /tmp/call-SERVER.log 2>&1; sleep 5'
+tmux new-session -d -s call-CONNECTION \
+  'pnpm exec tsx src/cli.ts CONNECTION toolName key=value --timeout 2000 > /tmp/call-CONNECTION.log 2>&1; sleep 5'
 sleep 2
-cat /tmp/call-SERVER.log
+cat /tmp/call-CONNECTION.log
 ```
 
 Checks:
@@ -58,18 +58,18 @@ Checks:
 
 ### Auth command
 
-For OAuth servers:
+For OAuth connections:
 
 ```bash
-tmux new-session -d -s auth-SERVER \
-  'pnpm exec tsx src/cli.ts auth SERVER --reset > /tmp/auth-SERVER.log 2>&1; sleep 5'
+tmux new-session -d -s auth-CONNECTION \
+  'pnpm exec tsx src/cli.ts auth CONNECTION --reset > /tmp/auth-CONNECTION.log 2>&1; sleep 5'
 sleep 2
-cat /tmp/auth-SERVER.log
+cat /tmp/auth-CONNECTION.log
 ```
 
 Expectations:
 - If a token cache exists, log should mention the cleared directory.
-- Failed auths emit the unified message (`Failed to authorize 'SERVER': ...`).
+- Failed auths emit the unified message (`Failed to authorize 'CONNECTION': ...`).
 
 ## Tips
 

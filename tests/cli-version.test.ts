@@ -6,7 +6,7 @@ import { MCPORTER_VERSION } from '../src/runtime.js';
 process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
 
-describe('mcporter --version', () => {
+describe('craft --version', () => {
   it('reads package.json when available, falling back to runtime version on failure', async () => {
     const { runCli } = await cliModulePromise;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

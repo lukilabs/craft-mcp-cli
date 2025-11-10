@@ -73,7 +73,7 @@ describe('command inference', () => {
   });
 
   describe('craft connection routing', () => {
-    it('routes craft <connection> to list with defaultConnection', async () => {
+    it('routes craft <connection> to tools with defaultConnection', async () => {
       mockLoadCraftConfig.mockResolvedValue({
         connections: [{ name: 'work', url: 'https://mcp.craft.do/links/SECRET/mcp' }],
         defaultConnection: 'work',
@@ -82,7 +82,7 @@ describe('command inference', () => {
       const result = await inferCommandRouting('work', [], definitions);
       expect(result).toEqual({
         kind: 'command',
-        command: 'list',
+        command: 'tools',
         args: [],
         defaultConnection: 'work',
       });
@@ -103,7 +103,7 @@ describe('command inference', () => {
       });
     });
 
-    it('routes craft <connection> list to list command with defaultConnection', async () => {
+    it('aborts when using reserved "list" keyword with connection', async () => {
       mockLoadCraftConfig.mockResolvedValue({
         connections: [{ name: 'work', url: 'https://mcp.craft.do/links/SECRET/mcp' }],
         defaultConnection: 'work',
@@ -111,10 +111,8 @@ describe('command inference', () => {
 
       const result = await inferCommandRouting('work', ['list'], definitions);
       expect(result).toEqual({
-        kind: 'command',
-        command: 'list',
-        args: [],
-        defaultConnection: 'work',
+        kind: 'abort',
+        exitCode: 1,
       });
     });
 

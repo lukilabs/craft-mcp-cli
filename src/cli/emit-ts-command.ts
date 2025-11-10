@@ -151,7 +151,7 @@ function parseEmitTsArgs(args: string[]): ParsedEmitTsOptions {
 
   const server = args.shift();
   if (!server) {
-    throw new Error('Usage: mcporter emit-ts <server> --out <file> [--mode types|client]');
+    throw new Error('Usage: craft emit-ts <server> --out <file> [--mode types|client]');
   }
   const outPath = flags.outPath;
   if (!outPath) {

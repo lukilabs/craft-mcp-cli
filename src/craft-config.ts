@@ -7,10 +7,11 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { updateCompletionsIfInstalled } from './cli/completion-command.js';
 import type { ServerDefinition } from './config.js';
 import { validateCraftUrl } from './craft-validation.js';
-import { isUnauthorizedError } from './runtime-oauth-support.js';
 import { createRuntime } from './runtime.js';
+import { isUnauthorizedError } from './runtime-oauth-support.js';
 
 export type CraftConnectionType = 'doc' | 'daily-notes';
 
@@ -58,9 +59,7 @@ export async function saveCraftConfig(config: CraftConfig): Promise<void> {
   await fs.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
 }
 
-type DiscoveryResult =
-  | { type: CraftConnectionType }
-  | { type?: undefined; reason: 'auth' | 'other' };
+type DiscoveryResult = { type: CraftConnectionType } | { type?: undefined; reason: 'auth' | 'other' };
 
 /**
  * Auto-discover connection type by connecting and inspecting tools
@@ -136,7 +135,7 @@ export async function addConnection(name: string, url: string, description?: str
   console.log(`Discovering connection type for ${name}...`);
   const discoveryResult = await discoverConnectionType(url);
   let type: CraftConnectionType | undefined;
-  
+
   if ('type' in discoveryResult) {
     type = discoveryResult.type;
     console.log(`✓ Detected type: ${type}`);
@@ -165,6 +164,11 @@ export async function addConnection(name: string, url: string, description?: str
 
   await saveCraftConfig(config);
   console.log(`✓ Added connection '${name}'${config.defaultConnection === name ? ' (default)' : ''}`);
+
+  // Update completions if they're installed
+  await updateCompletionsIfInstalled().catch(() => {
+    // Silently ignore errors - connection operation should succeed even if completion update fails
+  });
 }
 
 /**
@@ -187,6 +191,11 @@ export async function removeConnection(name: string): Promise<void> {
 
   await saveCraftConfig(config);
   console.log(`✓ Removed connection '${name}'`);
+
+  // Update completions if they're installed
+  await updateCompletionsIfInstalled().catch(() => {
+    // Silently ignore errors - connection operation should succeed even if completion update fails
+  });
 }
 
 /**
