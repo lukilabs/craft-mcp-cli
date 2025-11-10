@@ -175,6 +175,10 @@ function generateZshCompletion(): string {
 
 # Zsh completion for craft
 _craft() {
+  # Cache tool names to speed up completion
+  # Cache is invalidated when connections are added/removed
+  local cache_file="/tmp/craft-completion-cache-$USER"
+
   local -a commands
   commands=(
     'add:Add a Craft MCP connection'
@@ -224,14 +228,28 @@ _craft() {
     command)
       # Get tool names for completion alongside commands
       local tools
-      tools=$(craft _completion tools 2>/dev/null || echo "")
+
+      # Use cached tools if available, otherwise fetch
+      if [[ -f "$cache_file" ]]; then
+        tools=$(cat "$cache_file" 2>/dev/null || echo "")
+      fi
+
+      # If no cache, fetch and cache in background
+      if [ -z "$tools" ]; then
+        tools=$(craft _completion tools 2>/dev/null || echo "")
+        if [ -n "$tools" ]; then
+          echo "$tools" > "$cache_file" 2>/dev/null &
+        fi
+      fi
+
       if [ -n "$tools" ]; then
         local -a tool_completions
         for tool in \${(z)tools}; do
-          tool_completions+=("\$tool:Call tool on default connection")
+          tool_completions+=("\$tool:tool")
         done
-        _describe 'command' commands
-        _describe 'tool' tool_completions
+        # Show tools first (in their own group), then commands
+        _describe -t tools 'mcp tools' tool_completions
+        _describe -t commands 'commands' commands
       else
         _describe 'command' commands
       fi
@@ -292,8 +310,10 @@ _craft() {
         *)
           # Check if this is a connection name, if so show tools
           local connections
-          connections=$(craft _completion connections 2>/dev/null || echo "")
-          if [[ " \${(z)connections} " =~ " $words[1] " ]]; then
+          connections=($(craft _completion connections 2>/dev/null || echo ""))
+
+          # Check if first word is in connections array
+          if (( \${connections[(I)$words[1]]} )); then
             # It's a connection, show tools for that connection
             local tools
             tools=$(craft _completion tools "$words[1]" 2>/dev/null || echo "")
@@ -318,6 +338,9 @@ _craft() {
 }
 
 _craft "$@"
+
+# Explicitly register the completion
+compdef _craft craft
 `;
 }
 
@@ -472,6 +495,11 @@ export async function handleCompletions(args: string[]): Promise<void> {
   try {
     await installCompletion(shell, script, targetPath);
     console.log(`✓ Installed ${shell} completion to ${targetPath}`);
+
+    // Prime the cache in the background
+    console.log('Priming completion cache...');
+    await primeCompletionCache();
+
     console.log('');
     console.log('Restart your shell or run:');
     if (shell === 'zsh') {
@@ -485,6 +513,52 @@ export async function handleCompletions(args: string[]): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     logError(`Failed to install completion: ${message}`);
     process.exit(1);
+  }
+}
+
+/**
+ * Invalidate the completion cache
+ */
+export async function invalidateCompletionCache(): Promise<void> {
+  const cacheFile = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
+  try {
+    await fs.unlink(cacheFile);
+  } catch {
+    // Ignore errors if cache doesn't exist
+  }
+}
+
+/**
+ * Prime the completion cache with current tools
+ */
+export async function primeCompletionCache(): Promise<void> {
+  const cacheFile = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
+
+  try {
+    const { getDefaultConnection } = await import('../craft-config.js');
+    const { createCraftRuntime } = await import('../craft-runtime.js');
+
+    const defaultConn = await getDefaultConnection();
+    if (!defaultConn) {
+      return;
+    }
+
+    // Create runtime and fetch tools
+    const runtime = await createCraftRuntime(defaultConn.name, {
+      logger: { info: () => {}, warn: () => {}, error: () => {} }, // Silence logs
+    });
+
+    try {
+      const tools = await runtime.listTools(defaultConn.name, { autoAuthorize: false });
+      const toolNames = tools.map((tool) => tool.name).join(' ');
+
+      // Write to cache file
+      await fs.writeFile(cacheFile, toolNames, 'utf8');
+    } finally {
+      await runtime.close().catch(() => {});
+    }
+  } catch {
+    // Silently fail - cache priming is optional
   }
 }
 
@@ -532,6 +606,9 @@ export async function updateCompletionsIfInstalled(): Promise<void> {
       logError(`Failed to update ${shell} completions: ${message}`);
     }
   }
+
+  // Invalidate cache when connections change
+  await invalidateCompletionCache();
 
   // Show message if any shells were updated
   if (updatedShells.length > 0) {

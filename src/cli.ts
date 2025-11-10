@@ -240,7 +240,11 @@ export async function runCli(argv: string[]): Promise<void> {
   }
 
   if (command === 'emit-ts') {
-    const runtime = await createRuntime(runtimeOptions);
+    // Use Craft-only runtime (bypasses general config loading)
+    const runtime = await createCraftRuntime(undefined, {
+      logger: getActiveLogger(),
+      oauthTimeoutMs: oauthTimeoutOverride,
+    });
     try {
       await handleEmitTs(runtime, args);
     } finally {
