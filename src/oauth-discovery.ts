@@ -56,17 +56,25 @@ export async function discoverProtectedResourceMetadata(
   for (const url of wellKnownPaths) {
     try {
       logger?.info(`Trying Protected Resource Metadata discovery at ${url}`);
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      if (response.ok) {
-        const metadata = (await response.json()) as ProtectedResourceMetadata;
-        logger?.info(`Successfully discovered Protected Resource Metadata at ${url}`);
-        return metadata;
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          const metadata = (await response.json()) as ProtectedResourceMetadata;
+          logger?.info(`Successfully discovered Protected Resource Metadata at ${url}`);
+          return metadata;
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     } catch (error) {
       logger?.info(
@@ -92,17 +100,25 @@ export async function discoverAuthorizationServerMetadata(
   for (const url of wellKnownPaths) {
     try {
       logger?.info(`Trying Authorization Server Metadata discovery at ${url}`);
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      if (response.ok) {
-        const metadata = (await response.json()) as AuthorizationServerMetadata;
-        logger?.info(`Successfully discovered Authorization Server Metadata at ${url}`);
-        return metadata;
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          const metadata = (await response.json()) as AuthorizationServerMetadata;
+          logger?.info(`Successfully discovered Authorization Server Metadata at ${url}`);
+          return metadata;
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     } catch (error) {
       logger?.info(

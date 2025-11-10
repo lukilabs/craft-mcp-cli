@@ -270,7 +270,10 @@ export async function handleList(
   const startedAt = Date.now();
   if (flags.format === 'json') {
     try {
-      const metadataEntries = await withTimeout(loadToolMetadata(runtime, target, { includeSchema: true }), timeoutMs);
+      const metadataEntries = await withTimeout(
+        loadToolMetadata(runtime, target, { includeSchema: true, autoAuthorize: false }),
+        timeoutMs
+      );
       const durationMs = Date.now() - startedAt;
       const payload = {
         mode: 'server',
@@ -313,7 +316,10 @@ export async function handleList(
   }
   try {
     // Always request schemas so we can render CLI-style parameter hints without re-querying per tool.
-    const metadataEntries = await withTimeout(loadToolMetadata(runtime, target, { includeSchema: true }), timeoutMs);
+    const metadataEntries = await withTimeout(
+      loadToolMetadata(runtime, target, { includeSchema: true, autoAuthorize: false }),
+      timeoutMs
+    );
     const durationMs = Date.now() - startedAt;
     const summaryLine = printSingleServerHeader(
       definition,
