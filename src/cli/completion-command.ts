@@ -246,7 +246,7 @@ _craft() {
       if [ -n "$tools" ]; then
         local -a tool_completions
         for tool in \${(z)tools}; do
-          tool_completions+=("\$tool")
+          tool_completions+=("$tool")
         done
         # Show tools first (in their own group), then commands
         _describe -t tools 'mcp tools' tool_completions
@@ -549,7 +549,7 @@ export async function primeCompletionCache(): Promise<void> {
   const cacheDir = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
 
   try {
-    const { getDefaultConnection, listConnections } = await import('../craft-config.js');
+    const { getDefaultConnection } = await import('../craft-config.js');
     const { createCraftRuntime } = await import('../craft-runtime.js');
 
     const defaultConn = await getDefaultConnection();
@@ -705,9 +705,7 @@ async function handleToolCompletion(connectionName?: string): Promise<void> {
     try {
       // Set a race with timeout to avoid hanging completions
       const toolsPromise = runtime.listTools(conn.name, { autoAuthorize: false });
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 5000)
-      );
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
 
       const tools = await Promise.race([toolsPromise, timeoutPromise]);
       const toolNames = tools.map((tool) => tool.name);

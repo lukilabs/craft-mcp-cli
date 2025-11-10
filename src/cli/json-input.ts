@@ -132,7 +132,7 @@ export function generateTemplateFromSchema(schema: unknown, schemaFile?: string)
   };
 
   const properties = schemaObj.properties || {};
-  const required = schemaObj.required || [];
+  const _required = schemaObj.required || [];
 
   const lines: string[] = ['{'];
 

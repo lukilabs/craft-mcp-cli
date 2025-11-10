@@ -453,7 +453,9 @@ class McpRuntime implements Runtime {
         // We need to clear them and start a fresh OAuth flow
         if ('invalidateCredentials' in oauthSession.provider) {
           await (
-            oauthSession.provider as { invalidateCredentials: (scope: 'all' | 'tokens' | 'client' | 'verifier') => Promise<void> }
+            oauthSession.provider as {
+              invalidateCredentials: (scope: 'all' | 'tokens' | 'client' | 'verifier') => Promise<void>;
+            }
           ).invalidateCredentials('all');
         }
 

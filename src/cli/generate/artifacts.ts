@@ -76,6 +76,7 @@ async function bundleWithRolldown({
     format: runtimeKind === 'bun' ? 'esm' : 'cjs',
     sourcemap: false,
     minify,
+    inlineDynamicImports: true,
   });
   await fs.chmod(absTarget, 0o755);
   return absTarget;

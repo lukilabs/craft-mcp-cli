@@ -78,7 +78,7 @@ export function formatCallExpressionExample(
   serverName: string,
   toolName: string,
   options: GeneratedOption[],
-  extra?: { callSelector?: string; wrapExpression?: boolean }
+  _extra?: { callSelector?: string; wrapExpression?: boolean }
 ): string | undefined {
   const assignments = options
     .map((option) => ({ option, literal: pickExampleLiteral(option) }))
@@ -134,7 +134,7 @@ function formatInlineParameter(option: GeneratedOption, colorize: boolean): stri
   return `${option.property}${optionalSuffix}: ${typeAnnotation}`;
 }
 
-function quoteShellExpression(expression: string): string {
+function _quoteShellExpression(expression: string): string {
   if (!expression.includes("'")) {
     return `'${expression}'`;
   }
