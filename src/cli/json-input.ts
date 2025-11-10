@@ -64,8 +64,15 @@ export async function openEditorForArgs(toolSchema: ServerToolInfo): Promise<Rec
 
   const editor = process.env.EDITOR || process.env.VISUAL || 'nano';
 
+  // Add --wait flag for GUI editors that return immediately
+  const editorArgs = [tmpFile];
+  const editorBasename = path.basename(editor);
+  if (['code', 'subl', 'atom', 'mate'].includes(editorBasename)) {
+    editorArgs.unshift('--wait');
+  }
+
   return new Promise((resolve, reject) => {
-    const child = spawn(editor, [tmpFile], { stdio: 'inherit' });
+    const child = spawn(editor, editorArgs, { stdio: 'inherit', env: process.env });
 
     child.on('exit', async (code) => {
       if (code !== 0) {
