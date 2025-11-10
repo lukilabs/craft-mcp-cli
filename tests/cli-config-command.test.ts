@@ -149,6 +149,7 @@ describe('mcporter config CLI', () => {
             tokenCacheDir: tokenDir,
           },
         },
+        imports: [],
       }),
       'utf8'
     );
@@ -169,6 +170,7 @@ describe('mcporter config CLI', () => {
 
   it('lists only local entries by default and summarizes imports', async () => {
     process.env.XDG_CONFIG_HOME = path.join(tempDir, 'xdg-home');
+    const homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue(tempDir);
     await fs.mkdir(path.dirname(configPath), { recursive: true });
     await fs.writeFile(configPath, JSON.stringify({ mcpServers: {}, imports: ['cursor'] }), 'utf8');
     const cursorDir = path.join(tempDir, '.cursor');
@@ -187,6 +189,7 @@ describe('mcporter config CLI', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(captureLog(logs));
     await handleConfigCli(buildOptions({ configPath, rootDir: tempDir }), ['list']);
     spy.mockRestore();
+    homedirSpy.mockRestore();
     const output = logs.join('\n');
     expect(output).toContain('No local servers match');
     expect(output).toContain('Other sources available via --source import');
@@ -196,6 +199,7 @@ describe('mcporter config CLI', () => {
 
   it('lists import entries when --source import is provided', async () => {
     process.env.XDG_CONFIG_HOME = path.join(tempDir, 'xdg-home');
+    const homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue(tempDir);
     await fs.mkdir(path.dirname(configPath), { recursive: true });
     await fs.writeFile(configPath, JSON.stringify({ mcpServers: {}, imports: ['cursor'] }), 'utf8');
     const cursorDir = path.join(tempDir, '.cursor');
@@ -214,6 +218,7 @@ describe('mcporter config CLI', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(captureLog(logs));
     await handleConfigCli(buildOptions({ configPath, rootDir: tempDir }), ['list', '--json', '--source', 'import']);
     spy.mockRestore();
+    homedirSpy.mockRestore();
     const payload = JSON.parse(logs.join('\n')) as { servers: Array<{ name: string }> };
     expect(payload.servers.some((server) => server.name === 'cursor-only')).toBe(true);
   });

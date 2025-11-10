@@ -19,18 +19,18 @@ import { getActiveLogger, getActiveLogLevel, logError, logInfo, logWarn, setLogL
 import { consumeOutputFormat } from './cli/output-format.js';
 import { DEBUG_HANG, dumpActiveHandles, terminateChildProcesses } from './cli/runtime-debug.js';
 import { boldText, dimText, extraDimText, supportsAnsiColor } from './cli/terminal.js';
+import {
+  addConnection,
+  getConnection,
+  getDefaultConnection,
+  listConnections,
+  removeConnection,
+  useConnection,
+} from './craft-config.js';
+import { createCraftRuntime } from './craft-runtime.js';
 import { analyzeConnectionError } from './error-classifier.js';
 import { parseLogLevel } from './logging.js';
 import { createRuntime, MCPORTER_VERSION } from './runtime.js';
-import { createCraftRuntime } from './craft-runtime.js';
-import {
-  addConnection,
-  removeConnection,
-  listConnections,
-  useConnection,
-  getDefaultConnection,
-  getConnection,
-} from './craft-config.js';
 
 export { parseCallArguments } from './cli/call-arguments.js';
 export { handleCall } from './cli/call-command.js';
@@ -107,8 +107,13 @@ export async function runCli(argv: string[]): Promise<void> {
       return;
     }
 
-    const name = args[0]!;
-    const url = args[1]!;
+    const name = args[0];
+    const url = args[1];
+    if (!name || !url) {
+      console.error('Usage: craft add <name> <url> [--description <desc>]');
+      process.exit(1);
+      return;
+    }
     const descIndex = args.indexOf('--description');
     const description = descIndex !== -1 && args[descIndex + 1] ? args[descIndex + 1] : undefined;
 
@@ -129,7 +134,12 @@ export async function runCli(argv: string[]): Promise<void> {
       return;
     }
 
-    const name = args[0]!;
+    const name = args[0];
+    if (!name) {
+      console.error('Usage: craft remove <name>');
+      process.exit(1);
+      return;
+    }
     try {
       await removeConnection(name);
     } catch (error) {
@@ -147,7 +157,12 @@ export async function runCli(argv: string[]): Promise<void> {
       return;
     }
 
-    const name = args[0]!;
+    const name = args[0];
+    if (!name) {
+      console.error('Usage: craft use <name>');
+      process.exit(1);
+      return;
+    }
     try {
       await useConnection(name);
     } catch (error) {
@@ -316,9 +331,7 @@ function printHelp(message?: string): void {
   const globalFlags = formatGlobalFlags(colorize);
   const quickStart = formatQuickStart(colorize);
   const footer = formatHelpFooter(colorize);
-  const title = colorize
-    ? `${boldText('craft')} ${dimText('— Craft MCP CLI & SDK')}`
-    : 'craft — Craft MCP CLI & SDK';
+  const title = colorize ? `${boldText('craft')} ${dimText('— Craft MCP CLI & SDK')}` : 'craft — Craft MCP CLI & SDK';
   const lines = [
     title,
     '',
@@ -493,8 +506,7 @@ function formatQuickStart(colorize: boolean): string {
 
 function formatHelpFooter(colorize: boolean): string {
   const pointer = 'Run `craft <command> --help` for detailed flags.';
-  const autoLoad =
-    'craft uses Craft connections from ~/.craft/config.json (add with: craft add <name> <url>)';
+  const autoLoad = 'craft uses Craft connections from ~/.craft/config.json (add with: craft add <name> <url>)';
   if (!colorize) {
     return `${pointer}\n${autoLoad}`;
   }

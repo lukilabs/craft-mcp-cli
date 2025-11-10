@@ -17,7 +17,7 @@ describe('CLI call argument parsing', () => {
 
   it('accepts server and tool as separate positional arguments', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    const parsed = parseCallArguments(['chrome-devtools', 'list_pages']);
+    const parsed = await parseCallArguments(['chrome-devtools', 'list_pages']);
     expect(parsed.selector).toBe('chrome-devtools');
     expect(parsed.tool).toBe('list_pages');
     expect(parsed.args).toEqual({});
@@ -25,7 +25,7 @@ describe('CLI call argument parsing', () => {
 
   it('captures timeout flag values', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    const parsed = parseCallArguments(['chrome-devtools', '--timeout', '2500', '--tool', 'list_pages']);
+    const parsed = await parseCallArguments(['chrome-devtools', '--timeout', '2500', '--tool', 'list_pages']);
     expect(parsed.selector).toBe('chrome-devtools');
     expect(parsed.tool).toBe('list_pages');
     expect(parsed.timeoutMs).toBe(2500);
@@ -33,7 +33,7 @@ describe('CLI call argument parsing', () => {
 
   it('parses function-call syntax with named arguments', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    const parsed = parseCallArguments(['linear.create_comment(issueId: "ISSUE-123", notify: false)']);
+    const parsed = await parseCallArguments(['linear.create_comment(issueId: "ISSUE-123", notify: false)']);
     expect(parsed.server).toBe('linear');
     expect(parsed.tool).toBe('create_comment');
     expect(parsed.args).toEqual({ issueId: 'ISSUE-123', notify: false });
@@ -41,7 +41,7 @@ describe('CLI call argument parsing', () => {
 
   it('parses HTTP call expressions with named arguments', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    const parsed = parseCallArguments(['https://www.shadcn.io/api/mcp.getComponent(component: "vortex")']);
+    const parsed = await parseCallArguments(['https://www.shadcn.io/api/mcp.getComponent(component: "vortex")']);
     expect(parsed.server).toBe('https://www.shadcn.io/api/mcp');
     expect(parsed.tool).toBe('getComponent');
     expect(parsed.args).toEqual({ component: 'vortex' });
@@ -49,13 +49,13 @@ describe('CLI call argument parsing', () => {
 
   it('rejects conflicting server names between flags and call syntax', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    expect(() => parseCallArguments(['--server', 'github', 'linear.create_comment(issueId: "123")'])).toThrow(
+    await expect(parseCallArguments(['--server', 'github', 'linear.create_comment(issueId: "123")'])).rejects.toThrow(
       /Conflicting server names/
     );
   });
 
   it('surfaces a helpful error when function-call syntax cannot be parsed', async () => {
     const { parseCallArguments } = await cliModulePromise;
-    expect(() => parseCallArguments(['linear.create_comment(oops)'])).toThrow(CliUsageError);
+    await expect(parseCallArguments(['linear.create_comment(oops)'])).rejects.toThrow(CliUsageError);
   });
 });

@@ -33,12 +33,12 @@
 
 export {
   addConnection,
-  removeConnection,
-  listConnections,
   getConnection,
-  useConnection as setDefaultConnection,
   getDefaultConnection,
+  listConnections,
+  removeConnection,
   resolveConnection,
+  useConnection as setDefaultConnection,
 } from './craft-config.js';
 
 // ============================================================================
@@ -54,11 +54,22 @@ export { craftCallOnce, createCraftClient } from './craft-runtime.js';
 export { validateCraftUrl } from './craft-validation.js';
 
 // ============================================================================
+// Generic Runtime (for generate-cli)
+// ============================================================================
+
+export { createRuntime, callOnce } from './runtime.js';
+export { createServerProxy } from './server-proxy.js';
+export { wrapCallResult, createCallResult } from './result-utils.js';
+
+// ============================================================================
 // Types
 // ============================================================================
 
 export type {
+  CraftConfig,
   CraftConnection,
   CraftConnectionType,
-  CraftConfig,
 } from './craft-config.js';
+
+export type { Runtime, RuntimeOptions, CallOptions } from './runtime.js';
+export type { CallResult } from './result-utils.js';

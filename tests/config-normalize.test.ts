@@ -19,6 +19,7 @@ describe('config normalization', () => {
               baseUrl: 'https://example.com/mcp',
             },
           },
+          imports: [],
         },
         null,
         2

@@ -42,7 +42,7 @@ export async function inferCommandRouting(
       // Otherwise, treat it as a tool call: craft <connection> <toolName> <args...>
       return { kind: 'command', command: 'call', args: [nextToken, ...remainingArgs], defaultConnection: token };
     }
-  } catch (error) {
+  } catch {
     // If Craft config fails to load, continue with normal routing
   }
 
@@ -68,9 +68,14 @@ export async function inferCommandRouting(
       const craftConfig = await loadCraftConfig();
       if (craftConfig.defaultConnection) {
         // craft <toolName> -> call tool on default connection
-        return { kind: 'command', command: 'call', args: [token, ...args], defaultConnection: craftConfig.defaultConnection };
+        return {
+          kind: 'command',
+          command: 'call',
+          args: [token, ...args],
+          defaultConnection: craftConfig.defaultConnection,
+        };
       }
-    } catch (error) {
+    } catch {
       // Ignore and continue with normal error handling
     }
 
@@ -90,9 +95,14 @@ export async function inferCommandRouting(
       const craftConfig = await loadCraftConfig();
       if (craftConfig.defaultConnection) {
         // craft <toolName> -> call tool on default connection
-        return { kind: 'command', command: 'call', args: [token, ...args], defaultConnection: craftConfig.defaultConnection };
+        return {
+          kind: 'command',
+          command: 'call',
+          args: [token, ...args],
+          defaultConnection: craftConfig.defaultConnection,
+        };
       }
-    } catch (error) {
+    } catch {
       // Ignore and continue with normal error handling
     }
 

@@ -78,7 +78,8 @@ export async function handleList(
   let target = args.shift();
 
   // Special case: `craft list` with no args shows Craft connections
-  if (!target && !defaultConnection && !flags.ephemeral) {
+  // Only if there are no servers already defined in the runtime
+  if (!target && !defaultConnection && !flags.ephemeral && flags.format !== 'json' && runtime.getDefinitions().length === 0) {
     const { loadCraftConfig, listConnections } = await import('../craft-config.js');
     const config = await loadCraftConfig();
 

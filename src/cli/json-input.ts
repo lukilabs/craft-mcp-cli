@@ -1,7 +1,7 @@
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import type { ServerToolInfo } from '../runtime.js';
 
 /**
@@ -41,10 +41,10 @@ export async function parseJsonValue(value: string | undefined): Promise<unknown
   } catch (error) {
     throw new Error(
       `Invalid JSON: ${(error as Error).message}\n` +
-      `Supported formats:\n` +
-      `  - Inline JSON: '{"key": "value"}'\n` +
-      `  - File: @filename.json\n` +
-      `  - Stdin: -`
+        `Supported formats:\n` +
+        `  - Inline JSON: '{"key": "value"}'\n` +
+        `  - File: @filename.json\n` +
+        `  - Stdin: -`
     );
   }
 }
@@ -53,9 +53,7 @@ export async function parseJsonValue(value: string | undefined): Promise<unknown
  * Open an editor for the user to input tool arguments
  * Generates a template from the tool schema with helpful comments
  */
-export async function openEditorForArgs(
-  toolSchema: ServerToolInfo
-): Promise<Record<string, unknown>> {
+export async function openEditorForArgs(toolSchema: ServerToolInfo): Promise<Record<string, unknown>> {
   const template = generateTemplateFromSchema(toolSchema.inputSchema);
 
   const tmpDir = path.join(os.tmpdir(), 'craft-cli');
@@ -83,7 +81,7 @@ export async function openEditorForArgs(
         // Remove comments (lines starting with //)
         const jsonContent = content
           .split('\n')
-          .filter(line => !line.trim().startsWith('//'))
+          .filter((line) => !line.trim().startsWith('//'))
           .join('\n');
 
         resolve(JSON.parse(jsonContent));
@@ -123,7 +121,9 @@ export function generateTemplateFromSchema(schema: unknown): string {
 
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
-    if (!key) continue;
+    if (!key) {
+      continue;
+    }
 
     const prop = properties[key] as {
       description?: string;

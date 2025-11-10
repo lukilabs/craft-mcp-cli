@@ -4,10 +4,10 @@
  * Provides programmatic API for calling Craft MCP tools using connection names
  */
 
-import { createRuntime, type Runtime, type RuntimeOptions } from './runtime.js';
 import type { ServerDefinition } from './config.js';
-import { resolveConnection, getConnection, getDefaultConnection } from './craft-config.js';
+import { getConnection, getDefaultConnection, resolveConnection } from './craft-config.js';
 import { validateCraftUrl } from './craft-validation.js';
+import { createRuntime, type Runtime, type RuntimeOptions } from './runtime.js';
 
 /**
  * Create a Craft-only runtime that bypasses mcporter config loading
@@ -37,15 +37,11 @@ export async function createCraftRuntime(
   options: Omit<RuntimeOptions, 'servers'> = {}
 ): Promise<Runtime> {
   // Resolve connection name to actual connection
-  const conn = connectionName
-    ? await getConnection(connectionName)
-    : await getDefaultConnection();
+  const conn = connectionName ? await getConnection(connectionName) : await getDefaultConnection();
 
   if (!conn) {
     throw new Error(
-      connectionName
-        ? `Connection '${connectionName}' not found`
-        : 'No default connection set. Use: craft use <name>'
+      connectionName ? `Connection '${connectionName}' not found` : 'No default connection set. Use: craft use <name>'
     );
   }
 
@@ -145,8 +141,7 @@ export async function createCraftClient(connectionName: string) {
     /**
      * Call a tool on this connection
      */
-    callTool: (tool: string, args?: Record<string, unknown>) =>
-      runtime.callTool(conn.name, tool, { args }),
+    callTool: (tool: string, args?: Record<string, unknown>) => runtime.callTool(conn.name, tool, { args }),
 
     /**
      * List available tools on this connection

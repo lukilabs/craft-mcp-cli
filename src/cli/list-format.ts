@@ -90,7 +90,7 @@ export function classifyListError(
 } {
   const issue = analyzeConnectionError(error);
   if (issue.kind === 'auth') {
-    const authCommand = options?.authCommand ?? `mcporter auth ${serverName}`;
+    const authCommand = options?.authCommand ?? `craft auth ${serverName}`;
     const note = yellowText(`auth required — run '${authCommand}'`);
     return { colored: note, summary: 'auth required', category: 'auth', authCommand, issue };
   }

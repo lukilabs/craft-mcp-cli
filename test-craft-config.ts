@@ -6,9 +6,7 @@
 
 import {
   addConnection,
-  removeConnection,
   listConnections,
-  useConnection,
   getDefaultConnection,
   getConnection,
   resolveConnection,
@@ -30,8 +28,9 @@ async function runTests() {
     try {
       await addConnection('test', 'http://invalid.com/mcp', 'Test connection');
       console.log('✗ Should have failed validation');
-    } catch (error: any) {
-      console.log('✓ URL validation works:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log('✓ URL validation works:', message);
     }
     console.log();
 
@@ -51,8 +50,9 @@ async function runTests() {
     try {
       await getConnection('nonexistent');
       console.log('✗ Should have thrown error');
-    } catch (error: any) {
-      console.log('✓ Error handling works:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log('✓ Error handling works:', message);
     }
     console.log();
 
@@ -61,8 +61,9 @@ async function runTests() {
     try {
       await resolveConnection();
       console.log('Has default or succeeded');
-    } catch (error: any) {
-      console.log('✓ Properly handles no default:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log('✓ Properly handles no default:', message);
     }
     console.log();
 
@@ -78,4 +79,4 @@ async function runTests() {
   }
 }
 
-runTests();
+void runTests();

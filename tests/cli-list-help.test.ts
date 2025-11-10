@@ -27,7 +27,7 @@ describe('mcporter list help shortcut', () => {
 
     await runCli(['list', '--help']);
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: mcporter list'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: craft list'));
     expect(process.exitCode).toBe(0);
   });
 
@@ -37,7 +37,7 @@ describe('mcporter list help shortcut', () => {
 
     await runCli(['list', 'help']);
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: mcporter list'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: craft list'));
     expect(process.exitCode).toBe(0);
   });
 });

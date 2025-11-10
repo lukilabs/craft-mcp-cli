@@ -9,10 +9,10 @@ import { verifyBunAvailable } from './runtime.js';
 
 const localRequire = createRequire(import.meta.url);
 const packageRoot = fileURLToPath(new URL('../../..', import.meta.url));
-// Generated CLIs import commander/mcporter, but end-users run mcporter from directories
+// Generated CLIs import commander/craft-mcp-cli, but end-users run craft from directories
 // that often lack node_modules. Pre-resolve those deps to this package so bundling works
 // even in empty temp dirs (fixes #1).
-const BUNDLED_DEPENDENCIES = ['commander', 'mcporter'] as const;
+const BUNDLED_DEPENDENCIES = ['commander', 'craft-mcp-cli'] as const;
 const dependencyAliasPlugin = createLocalDependencyAliasPlugin([...BUNDLED_DEPENDENCIES]);
 
 export async function bundleOutput({
@@ -207,12 +207,14 @@ function resolveLocalDependency(specifier: string): string | undefined {
   try {
     return localRequire.resolve(specifier);
   } catch {
-    if (specifier === 'mcporter') {
+    if (specifier === 'craft-mcp-cli') {
       // During development or unpublished builds there may not be an installed entry,
       // so fall back to the files inside the repo that represent the published surface.
       const fallbacks = [
+        path.join(packageRoot, 'dist', 'sdk.js'),
         path.join(packageRoot, 'dist', 'index.js'),
         path.join(packageRoot, 'dist', 'index.mjs'),
+        path.join(packageRoot, 'src', 'sdk.ts'),
         path.join(packageRoot, 'src', 'index.ts'),
         path.join(packageRoot, 'src', 'index.js'),
       ];
@@ -243,7 +245,7 @@ async function ensureBundlerDeps(stagingDir: string): Promise<void> {
 
 function resolveDependencyDirectory(specifier: (typeof BUNDLED_DEPENDENCIES)[number]): string | undefined {
   try {
-    if (specifier === 'mcporter') {
+    if (specifier === 'craft-mcp-cli') {
       return packageRoot;
     }
     const pkgPath = localRequire.resolve(path.join(specifier, 'package.json'));

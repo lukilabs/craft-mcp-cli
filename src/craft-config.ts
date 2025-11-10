@@ -7,9 +7,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createRuntime } from './runtime.js';
 import type { ServerDefinition } from './config.js';
 import { validateCraftUrl } from './craft-validation.js';
+import { createRuntime } from './runtime.js';
 
 export type CraftConnectionType = 'doc' | 'daily-notes';
 
@@ -25,8 +25,13 @@ export interface CraftConfig {
   defaultConnection?: string;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.craft');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+function getConfigDir(): string {
+  return path.join(os.homedir(), '.craft');
+}
+
+function getConfigPath(): string {
+  return path.join(getConfigDir(), 'config.json');
+}
 
 /**
  * Load Craft config from ~/.craft/config.json
@@ -34,10 +39,10 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
  */
 export async function loadCraftConfig(): Promise<CraftConfig> {
   try {
-    const content = await fs.readFile(CONFIG_PATH, 'utf-8');
+    const content = await fs.readFile(getConfigPath(), 'utf-8');
     return JSON.parse(content);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       return { connections: [] };
     }
     throw error;
@@ -48,8 +53,8 @@ export async function loadCraftConfig(): Promise<CraftConfig> {
  * Save Craft config to ~/.craft/config.json
  */
 export async function saveCraftConfig(config: CraftConfig): Promise<void> {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+  await fs.mkdir(getConfigDir(), { recursive: true });
+  await fs.writeFile(getConfigPath(), JSON.stringify(config, null, 2), 'utf-8');
 }
 
 /**
@@ -97,7 +102,8 @@ async function discoverConnectionType(url: string): Promise<CraftConnectionType 
   } catch (error) {
     // If we can't connect or discover, return undefined
     // Connection might require OAuth or be temporarily unavailable
-    console.warn(`Warning: Could not auto-discover type for ${url}: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: Could not auto-discover type for ${url}: ${errorMessage}`);
     return undefined;
   }
 }
@@ -105,11 +111,7 @@ async function discoverConnectionType(url: string): Promise<CraftConnectionType 
 /**
  * Add a new Craft connection
  */
-export async function addConnection(
-  name: string,
-  url: string,
-  description?: string
-): Promise<void> {
+export async function addConnection(name: string, url: string, description?: string): Promise<void> {
   // Validate URL
   validateCraftUrl(url);
 
@@ -256,9 +258,7 @@ export async function resolveConnection(nameOrDefault?: string): Promise<CraftCo
 
   const defaultConn = await getDefaultConnection();
   if (!defaultConn) {
-    throw new Error(
-      'No default connection set. Use: craft use <name> or specify connection explicitly.'
-    );
+    throw new Error('No default connection set. Use: craft use <name> or specify connection explicitly.');
   }
 
   return defaultConn;

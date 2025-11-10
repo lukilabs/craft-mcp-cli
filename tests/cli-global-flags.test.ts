@@ -23,7 +23,7 @@ describe('mcporter global shortcuts', () => {
 
     await runCli(['--help']);
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: mcporter'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: craft'));
     expect(process.exitCode).toBe(0);
   });
 
@@ -33,7 +33,7 @@ describe('mcporter global shortcuts', () => {
 
     await runCli(['help']);
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: mcporter'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: craft'));
     expect(process.exitCode).toBe(0);
   });
 

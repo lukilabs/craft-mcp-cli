@@ -3,10 +3,10 @@ import { parseCallExpressionFragment } from './call-expression-parser.js';
 import { extractEphemeralServerFlags } from './ephemeral-flags.js';
 import { CliUsageError } from './errors.js';
 import { splitHttpToolSelector } from './http-utils.js';
+import { parseJsonValue } from './json-input.js';
 import { consumeOutputFormat } from './output-format.js';
 import type { OutputFormat } from './output-utils.js';
 import { consumeTimeoutFlag } from './timeouts.js';
-import { parseJsonValue } from './json-input.js';
 
 export interface CallArgsParseResult {
   selector?: string;
