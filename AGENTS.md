@@ -1,69 +1,501 @@
-# Repository Guidelines
+# Craft MCP CLI Usage Guide
 
-If you are unsure about sth, just google it.
+A practical guide for using the Craft MCP CLI to interact with Craft documents via the Model Context Protocol.
 
-## Project Structure & Module Organization
-- `src/`: TypeScript source for the runtime and CLI entry points (`cli.ts`, `runtime.ts`, etc.).
-- `tests/`: Vitest suites mirroring runtime behaviors; integration specs live alongside unit tests.
-- `docs/`: Reference material for MCP usage and server coordination.
-- `dist/`: Generated build artifacts; never edit by hand.
+## Quick Start
 
-## Build, Test, and Development Commands
-- `pnpm build`: Emits compiled JS and type declarations via `tsc -p tsconfig.build.json`.
-- `pnpm lint`: Runs Biome style checks, Oxlint+tsgolint rules, and a `tsgo --noEmit` type pass.
-- `pnpm test`: Executes the full Vitest suite once.
-- `pnpm dev`: Watches and incrementally rebuilds the library with TypeScript.
-- `pnpm clean`: Removes `dist/` so you can verify fresh builds.
-- `pnpm run docs:list`: Lists required rule summaries via `scripts/docs-list.ts`; run this at the start of every session and reopen any referenced doc before writing code.
-- `tmux new-session -- pnpm mcporter:list`: Exercise the CLI in a resilient terminal; tmux makes it easy to spot stalls or hung servers.
-- `gh run list --limit 1 --watch`: Stream CI status in real time; use `gh run view --log` on the returned run id to inspect failures quickly.
+### Installation
 
-## Guardrail Tooling (runner/git wrappers)
-- Use `./runner <command>` for every non-trivial shell command (tests, builds, npm, node, bun, etc.). The Bun-backed runner enforces timeouts, blocks risky subcommands, and keeps logs consistent. Only simple read-only tools (e.g., `cat`, `ls`, `rg`) may bypass it.
-- When you must run git, invoke it through the wrapper: `./runner git status -sb`, `./runner git diff`, or `./runner git log`. Those are the only git subcommands permitted. Never run `git push` unless the user asks explicitly, and even then go through `./runner git push`.
-- These runner/committer rules only apply to this mcporter repo—other repositories should use their own native tooling (no cross-repo runner reuse).
-- Never call `git add` / `git commit` directly. To create a commit, list the exact paths via `./scripts/committer "type: summary" path/to/file1 path/to/file2`.
-- If you need to run the Bun-based git policy helper directly, you can use `./git ...`, but prefer `./runner git ...` so logging stays uniform.
+```bash
+npm install -g craft-mcp-cli
+```
 
-## Agent Scripts Mirror
-- The guardrail helpers (`runner`, `scripts/runner.ts`, `scripts/committer`, `bin/git`, `scripts/git-policy.ts`, `scripts/docs-list.ts`, etc.) are mirrored in `~/Projects/agent-scripts`. Any time you edit one of these files here, immediately copy the same change into the mirror (and vice versa) before moving on so the two repos stay byte-for-byte identical.
-- When the user says “sync agent scripts,” jump to `~/Projects/agent-scripts`, update it (respecting the git guardrails), diff against this repo, and reconcile changes in both directions. Keep syncing until both repos are clean and committed.
+Or use without installing:
 
-## Coding Style & Naming Conventions
-- TypeScript files use 2-space indentation, modern ES module syntax, and `strict` compiler settings.
-- Imports stay sorted logically; prefer relative paths within `src/`.
-- Run `pnpm lint:biome` before committing to auto-fix formatting; `pnpm lint:oxlint` enforces additional TypeScript rules powered by tsgolint.
-- Use descriptive function and symbol names (`createRuntime`, `StreamableHTTPServerTransport`) and favor `const` for bindings.
+```bash
+npx craft-mcp-cli list
+```
 
-## Testing Guidelines
-- Add unit tests under `tests/`; mirror filename (`runtime.test.ts`) against the module under test.
-- Use Vitest’s `describe/it/expect` APIs; keep asynchronous tests `async` to match runtime usage.
-- For integration scenarios, reuse the HTTP harness shown in `tests/runtime-integration.test.ts` and ensure transports close in `afterAll`.
-- Validate new work with `pnpm test` and confirm `pnpm lint` stays green.
+### Basic Workflow
 
-## Changelog Guidelines
-- Focus on user-facing behavior changes; avoid calling out internal testing-only updates.
-- **Never mention doc-only edits** in the changelog. If a change only touches docs (or docs + tests) leave the changelog untouched. Only add entries when runtime behavior, CLI UX, or generated artifacts change.
+1. **Add a Craft connection** (get the MCP URL from Craft document share settings):
 
-## Commit & Pull Request Guidelines
-- Use Conventional Commits (https://www.conventionalcommits.org/en/v1.0.0/) with the allowed types `feat|fix|refactor|build|ci|chore|docs|style|perf|test`, optional scopes (`type(scope): description`), and `!` for breaking changes (e.g., `feat: Prevent racing of requests`, `chore!: Drop support for iOS 16`).
-- Commits should be scoped and written in imperative mood (`feat: add runtime cache eviction`, `fix(cli): ensure list handles empty config`).
-- Reference related issues in the body (`Refs #123`) and describe observable behavior changes.
-- Pull requests should summarize the change set, list verification steps (`pnpm lint`, `pnpm test`), and include screenshots or logs when CLI output changes.
+   ```bash
+   craft add work https://mcp.craft.do/links/XXX/mcp
+   ```
 
-## Security & Configuration Tips
-- Keep secrets out of the repo; pass credentials via environment variables when exercising MCP servers.
-- Local scripts under `scripts/` (e.g., `mcp_signoz_retry_patch.cjs`) are safe shims for Sweetistics workflows—review them before extending.
+2. **List connections**:
 
-## Common mcporter Workflows & Shortcuts
-- **List configured servers**: `npx mcporter list [--json]` shows health, counts, and hints; re-run with `--server <name>` for focused detail.
-- **Ad-hoc HTTP**: `npx mcporter call https://host/path.toolName(arg: "value")` automatically infers transport; add `--allow-http` for plain HTTP.
-- **Ad-hoc stdio / third-party packages**: `npx mcporter call --stdio "npx -y package@latest" --name friendly-name <tool>` launches transient MCP servers (ideal for Chrome DevTools or Playwright friends with no config).
-- **Generate standalone CLIs**: `npx mcporter generate-cli <server-or-adhoc-flags> --output cli.ts [--bundle dist/cli.js --compile]` embeds schema+commands; combine with `--stdio`/`--http-url` to avoid editing configs.
-- **Emit typed clients**: `npx mcporter emit-ts <server> --mode client --out clients/name.ts [--include-optional]` for TypeScript interfaces + helper factories (use `--mode types` for `.d.ts` only).
-- **Inspect/Regenerate artifacts**: `npx mcporter inspect-cli dist/thing.js` prints metadata and replay command; `npx mcporter generate-cli --from dist/thing.js` reruns with the latest mcporter.
+   ```bash
+   craft list
+   ```
 
-## Release Reminders
-- Always read `RELEASE.md` before starting a release; follow every step (including Homebrew + docs updates) before tagging/publishing.
-- Global help automatically short-circuits regardless of command inference. Use `mcporter help list` if you need command-specific detail.
-- Global help automatically short-circuits regardless of command inference. Use `mcporter help list` if you need command-specific detail.
+3. **View available tools**:
+
+   ```bash
+   craft tools              # Default connection
+   craft tools work         # Specific connection
+   ```
+
+4. **Call a tool**:
+
+   ```bash
+   craft collections_list                    # Default connection
+   craft work blocks_get id:abc123          # Specific connection
+   ```
+
+## Connection Management
+
+### Adding Connections
+
+```bash
+# Basic add
+craft add <name> <url>
+
+# With description
+craft add work https://mcp.craft.do/links/XXX/mcp --description "Work documents"
+
+# The CLI automatically detects connection type (doc vs daily-notes)
+```
+
+### Managing Connections
+
+```bash
+craft list                    # List all connections with status
+craft connections             # Alias for list
+craft use <name>              # Set default connection
+craft remove <name>           # Remove a connection
+```
+
+### Connection Types
+
+The CLI automatically detects:
+
+- **Document connections** (`doc`) - Individual Craft documents
+- **Daily Notes connections** (`daily-notes`) - Daily notes workspace
+
+## Tool Calling
+
+### Basic Syntax
+
+```bash
+# Call on default connection
+craft <toolName> [args...]
+
+# Call on specific connection
+craft <connection> <toolName> [args...]
+```
+
+### Argument Formats
+
+Use `key:value` or `key=value` syntax:
+
+```bash
+craft blocks_get id:abc123
+craft blocks_update id:abc123 content:'{"type":"textBlock","content":"Hello"}'
+```
+
+### Viewing Tool Signatures
+
+```bash
+# List tools with signatures
+craft tools work
+
+# Include all optional parameters
+craft tools work --all-parameters
+
+# View raw JSON schemas
+craft tools work --schema
+```
+
+### Advanced Argument Input
+
+**From JSON file:**
+
+```bash
+craft blocks_update --args @data.json
+```
+
+**From stdin:**
+
+```bash
+echo '{"id":"abc"}' | craft blocks_get --args -
+```
+
+**Interactive editor mode:**
+
+```bash
+craft blocks_update --edit
+```
+
+The `--edit` flag:
+
+- Opens your `$EDITOR` (or `$VISUAL`, defaults to `nano`)
+- Pre-fills a JSON template from the tool's schema
+- Supports `//` comments in JSON (removed before parsing)
+- Automatically adds `--wait` for GUI editors (VS Code, Sublime, etc.)
+- Only works for tools with input schemas
+
+## Common Workflows
+
+### Listing Collections
+
+```bash
+craft collections_list
+craft work collections_list --json  # Raw JSON output
+```
+
+### Reading Blocks
+
+```bash
+craft blocks_get id:abc123
+craft work blocks_get id:abc123 --json
+```
+
+### Updating Blocks
+
+```bash
+# Simple update
+craft blocks_update id:abc123 content:'{"type":"textBlock","content":"New content"}'
+
+# Complex update with editor
+craft blocks_update --edit
+```
+
+### Working with Multiple Connections
+
+```bash
+# Set default
+craft use work
+
+# Call on default
+craft collections_list
+
+# Override for one call
+craft personal collections_list
+```
+
+## Output Formats
+
+```bash
+# Human-readable (default)
+craft collections_list
+
+# Raw JSON
+craft collections_list --json
+
+# Debug logging
+craft list --log-level debug
+```
+
+## OAuth Authentication
+
+Some Craft connections require OAuth:
+
+```bash
+# Complete OAuth flow
+craft auth work
+
+# Reset OAuth credentials
+craft auth work --reset
+```
+
+## TypeScript SDK Usage
+
+### One-Shot Tool Calls
+
+```typescript
+import { craftCallOnce } from 'craft-mcp-cli';
+
+const result = await craftCallOnce({
+  connection: 'work',
+  tool: 'collections_list'
+});
+
+console.log(result.text());
+```
+
+### Persistent Client
+
+```typescript
+import { createCraftClient } from 'craft-mcp-cli';
+
+const client = await createCraftClient('work');
+const tools = await client.listTools();
+const collections = await client.callTool('collections_list');
+await client.close();
+```
+
+### Connection Management API
+
+```typescript
+import {
+  addConnection,
+  listConnections,
+  getConnection,
+  setDefaultConnection,
+  getDefaultConnection
+} from 'craft-mcp-cli';
+
+// Add connection programmatically
+await addConnection('work', 'https://mcp.craft.do/links/XXX/mcp');
+
+// Get connection info
+const conn = await getConnection('work');
+console.log(conn.type); // 'doc' or 'daily-notes'
+
+// Set default
+await setDefaultConnection('work');
+```
+
+## Code Generation (Minting)
+
+### Generate TypeScript Types
+
+```bash
+# Types-only (interface definitions)
+craft emit-ts work --out types/work-tools.d.ts
+
+# Full client with runtime helpers
+craft emit-ts work --mode client --out clients/work.ts
+
+# Include all optional parameters
+craft emit-ts work --mode client --out clients/work.ts --include-optional
+```
+
+**Types mode** (`--mode types`, default):
+
+- Generates `.d.ts` file with TypeScript interfaces
+- Includes doc comments and parameter hints
+- Perfect for type-checking existing code
+
+**Client mode** (`--mode client`):
+
+- Generates both `.ts` and `.d.ts` files
+- Includes factory function (e.g., `createWorkClient()`)
+- Wraps `createServerProxy` with proper types
+- Handles runtime creation and cleanup
+
+Example generated client:
+
+```typescript
+import { createWorkClient } from './clients/work.js';
+
+const client = await createWorkClient();
+const collections = await client.collections_list();
+console.log(collections.text());
+await client.close();
+```
+
+### Generate Standalone CLIs
+
+```bash
+# Generate TypeScript CLI
+craft generate-cli work --output cli/work.ts
+
+# Bundle into single JavaScript file
+craft generate-cli work --bundle dist/work.js
+
+# Compile to native binary (Bun only)
+craft generate-cli work --compile dist/work
+```
+
+**Features:**
+
+- Schema-aware: Maps tool arguments to CLI flags
+- Self-contained: Embeds connection configuration
+- Multiple formats: TypeScript, bundled JS, or compiled binary
+- Regeneration: Use `craft inspect-cli <artifact>` to see metadata
+
+**Using generated CLI:**
+
+```bash
+chmod +x dist/work.js
+./dist/work.js collections_list
+./dist/work.js blocks_get --id abc123
+```
+
+### Inspect Generated Artifacts
+
+```bash
+# View metadata and regeneration command
+craft inspect-cli dist/work.js
+
+# Regenerate from artifact
+craft generate-cli --from dist/work.js
+```
+
+## Configuration
+
+Connections are stored in `~/.craft/config.json`:
+
+```json
+{
+  "connections": [
+    {
+      "name": "work",
+      "url": "https://mcp.craft.do/links/XXX/mcp",
+      "type": "doc",
+      "description": "Work documents"
+    }
+  ],
+  "defaultConnection": "work"
+}
+```
+
+## Tips & Best Practices
+
+### 1. Always Check Available Tools First
+
+```bash
+craft tools <connection>
+```
+
+This shows you:
+
+- Available tool names
+- Required and optional parameters
+- Type signatures
+- Documentation comments
+
+### 2. Use `--edit` for Complex Arguments
+
+When calling tools with complex nested objects, use `--edit`:
+
+```bash
+craft blocks_update --edit
+```
+
+This opens an editor with a pre-filled template based on the tool's schema.
+
+### 3. Set a Default Connection
+
+```bash
+craft use work
+```
+
+Then you can call tools without specifying the connection each time.
+
+### 4. Use JSON Output for Automation
+
+```bash
+craft collections_list --json | jq '.collections[0].id'
+```
+
+### 5. Debug Connection Issues
+
+```bash
+craft list --log-level debug
+```
+
+This shows detailed connection status and any errors.
+
+### 6. Regenerate Types When Schemas Change
+
+If a Craft connection's tools change, regenerate your TypeScript types:
+
+```bash
+craft emit-ts work --mode client --out clients/work.ts
+```
+
+### 7. Test Tools Before Automating
+
+Always test a tool call manually before building automation:
+
+```bash
+craft tools work              # See what's available
+craft work collections_list   # Test the call
+craft work collections_list --json  # See the raw response
+```
+
+## Error Handling
+
+### Common Errors
+
+**Connection not found:**
+
+```bash
+craft use nonexistent
+# Error: Connection 'nonexistent' not found
+```
+
+**Tool not found:**
+
+```bash
+craft invalid_tool
+# Error: Tool 'invalid_tool' not found
+```
+
+**Missing required arguments:**
+
+```bash
+craft blocks_get
+# Error: Missing required argument: id
+```
+
+**OAuth required:**
+
+```bash
+craft collections_list
+# Error: OAuth authentication required. Run: craft auth work
+```
+
+### Debugging
+
+Enable debug logging to see detailed error information:
+
+```bash
+craft <command> --log-level debug
+```
+
+## Examples
+
+### List all collections and their IDs
+
+```bash
+craft collections_list --json | jq -r '.collections[] | "\(.id): \(.name)"'
+```
+
+### Get a specific block
+
+```bash
+craft blocks_get id:abc123
+```
+
+### Update block content
+
+```bash
+craft blocks_update id:abc123 content:'{"type":"textBlock","content":"Updated"}'
+```
+
+### Generate typed client for automation
+
+```bash
+craft emit-ts work --mode client --out src/craft-client.ts
+```
+
+Then use in your code:
+
+```typescript
+import { createWorkClient } from './craft-client.js';
+
+const client = await createWorkClient();
+const collections = await client.collections_list();
+// Fully typed!
+```
+
+## Getting Help
+
+```bash
+craft help                    # General help
+craft help list              # Command-specific help
+craft tools --help           # Tool listing help
+```
+
+## See Also
+
+- `README.md` - Full documentation and examples
+- `docs/cli-reference.md` - Quick command reference
+- `docs/emit-ts.md` - Type generation details
+- `docs/cli-generator.md` - CLI generation details
+- `docs/call-syntax.md` - Advanced call syntax patterns
