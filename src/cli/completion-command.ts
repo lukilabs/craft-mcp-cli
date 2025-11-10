@@ -177,7 +177,8 @@ function generateZshCompletion(): string {
 _craft() {
   # Cache tool names to speed up completion
   # Cache is invalidated when connections are added/removed
-  local cache_file="/tmp/craft-completion-cache-$USER"
+  local cache_dir="/tmp/craft-completion-cache-$USER"
+  local cache_file="$cache_dir/default"
 
   local -a commands
   commands=(
@@ -245,7 +246,7 @@ _craft() {
       if [ -n "$tools" ]; then
         local -a tool_completions
         for tool in \${(z)tools}; do
-          tool_completions+=("\$tool:tool")
+          tool_completions+=("\$tool")
         done
         # Show tools first (in their own group), then commands
         _describe -t tools 'mcp tools' tool_completions
@@ -308,28 +309,41 @@ _craft() {
           _arguments $global_flags
           ;;
         *)
-          # Check if this is a connection name, if so show tools
+          # Check if this is a connection name followed by a tool
           local connections
           connections=($(craft _completion connections 2>/dev/null || echo ""))
 
-          # Check if first word is in connections array
+          # Check if first word is a connection
           if (( \${connections[(I)$words[1]]} )); then
-            # It's a connection, show tools for that connection
-            local tools
-            tools=$(craft _completion tools "$words[1]" 2>/dev/null || echo "")
-            if [ -n "$tools" ]; then
-              local -a tool_completions
-              for tool in \${(z)tools}; do
-                tool_completions+=("\$tool")
-              done
-              _arguments \\
-                "1:tool:(\${tool_completions[@]})" \\
-                $global_flags
+            # First word is a connection
+            if [[ $CURRENT -eq 2 ]]; then
+              # We're at position 2, show tools (with caching)
+              local conn_cache_file="$cache_dir/$words[1]"
+              local conn_tools
+
+              # Try cache first
+              if [[ -f "$conn_cache_file" ]]; then
+                conn_tools=$(cat "$conn_cache_file" 2>/dev/null || echo "")
+              fi
+
+              # If no cache, fetch and cache in background
+              if [ -z "$conn_tools" ]; then
+                conn_tools=$(craft _completion tools "$words[1]" 2>/dev/null || echo "")
+                if [ -n "$conn_tools" ]; then
+                  mkdir -p "$cache_dir" 2>/dev/null
+                  echo "$conn_tools" > "$conn_cache_file" 2>/dev/null &
+                fi
+              fi
+
+              if [ -n "$conn_tools" ]; then
+                local -a tool_array
+                tool_array=(\${(z)conn_tools})
+                _describe 'tools' tool_array
+              fi
             else
-              _arguments $global_flags
+              # We're past the tool name, show nothing (user will type arguments)
+              return 0
             fi
-          else
-            _arguments $global_flags
           fi
           ;;
       esac
@@ -520,9 +534,9 @@ export async function handleCompletions(args: string[]): Promise<void> {
  * Invalidate the completion cache
  */
 export async function invalidateCompletionCache(): Promise<void> {
-  const cacheFile = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
+  const cacheDir = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
   try {
-    await fs.unlink(cacheFile);
+    await fs.rm(cacheDir, { recursive: true, force: true });
   } catch {
     // Ignore errors if cache doesn't exist
   }
@@ -532,10 +546,10 @@ export async function invalidateCompletionCache(): Promise<void> {
  * Prime the completion cache with current tools
  */
 export async function primeCompletionCache(): Promise<void> {
-  const cacheFile = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
+  const cacheDir = `/tmp/craft-completion-cache-${process.env.USER || 'default'}`;
 
   try {
-    const { getDefaultConnection } = await import('../craft-config.js');
+    const { getDefaultConnection, listConnections } = await import('../craft-config.js');
     const { createCraftRuntime } = await import('../craft-runtime.js');
 
     const defaultConn = await getDefaultConnection();
@@ -543,7 +557,10 @@ export async function primeCompletionCache(): Promise<void> {
       return;
     }
 
-    // Create runtime and fetch tools
+    // Ensure cache directory exists
+    await fs.mkdir(cacheDir, { recursive: true });
+
+    // Prime cache for default connection
     const runtime = await createCraftRuntime(defaultConn.name, {
       logger: { info: () => {}, warn: () => {}, error: () => {} }, // Silence logs
     });
@@ -552,8 +569,9 @@ export async function primeCompletionCache(): Promise<void> {
       const tools = await runtime.listTools(defaultConn.name, { autoAuthorize: false });
       const toolNames = tools.map((tool) => tool.name).join(' ');
 
-      // Write to cache file
-      await fs.writeFile(cacheFile, toolNames, 'utf8');
+      // Write to cache files (both default and connection-specific)
+      await fs.writeFile(`${cacheDir}/default`, toolNames, 'utf8');
+      await fs.writeFile(`${cacheDir}/${defaultConn.name}`, toolNames, 'utf8');
     } finally {
       await runtime.close().catch(() => {});
     }
